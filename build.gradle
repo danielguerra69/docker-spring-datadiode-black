@@ -1,0 +1,43 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.2.6.RELEASE")
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+
+jar {
+    baseName = 'gs-messaging-rabbitmq'
+    version =  '0.1.0'
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+dependencies {
+    compile "org.springframework.boot:spring-boot-starter-amqp"
+    compile "org.springframework.integration:spring-integration-ip:4.2.0.RELEASE"
+    compile "org.springframework.integration:spring-integration-amqp:4.2.0.RELEASE"
+    compile "org.springframework.amqp:spring-rabbit:1.5.0.RELEASE"
+    compile "org.springframework.amqp:spring-amqp:1.5.0.RELEASE"
+
+    testCompile("junit:junit")
+    testCompile("org.springframework.boot:spring-boot-starter-test")
+
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.3'
+}
+
+mainClassName = "nl.maatkamp.datadiode.black.DatadiodeBlackStarter"
