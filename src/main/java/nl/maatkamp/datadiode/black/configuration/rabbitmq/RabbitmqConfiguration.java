@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 /**
  * Created by marcel on 23-09-15.
@@ -29,13 +30,22 @@ public class RabbitmqConfiguration implements MessageListener {
     @Autowired
     RabbitTemplate rabbitTemplate;
 
+    @Autowired
+    Environment environment;
+
     // https://github.com/spring-projects/spring-amqp/blob/master/spring-rabbit/src/test/java/org/springframework/amqp/rabbit/core/RabbitManagementTemplateTests.java
     // List<Exchange> list = this.template.getExchanges();
     // public static BrokerRunning brokerAndManagementRunning = BrokerRunning.isBrokerAndManagementRunning();
     // https://github.com/spring-projects/spring-integration/blob/master/spring-integration-ip/src/main/java/org/springframework/integration/ip/config/UdpOutboundChannelAdapterParser.java
-    //
-    @Autowired
-    RabbitManagementTemplate rabbitManagementTemplate;
+    @Bean
+    RabbitManagementTemplate rabbitManagementTemplate() {
+        RabbitManagementTemplate rabbitManagementTemplate = new RabbitManagementTemplate(
+                "http://"+environment.getProperty("spring.rabbitmq.host")+":1"+environment.getProperty("spring.rabbitmq.port", Integer.class)+"/api/",
+                environment.getProperty("spring.rabbitmq.username"),
+                environment.getProperty("spring.rabbitmq.password")
+        );
+        return rabbitManagementTemplate;
+    }
 
     @Bean
     Queue queue() {
