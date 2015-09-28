@@ -24,12 +24,16 @@ repositories {
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
+
+
 dependencies {
     compile "org.springframework.boot:spring-boot-starter-amqp"
     compile "org.springframework.integration:spring-integration-ip:4.2.0.RELEASE"
     compile "org.springframework.integration:spring-integration-amqp:4.2.0.RELEASE"
     compile "org.springframework.amqp:spring-rabbit:1.5.0.RELEASE"
     compile "org.springframework.amqp:spring-amqp:1.5.0.RELEASE"
+
+
 
     testCompile("junit:junit")
     testCompile("org.springframework.boot:spring-boot-starter-test")
