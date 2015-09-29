@@ -8,12 +8,20 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
+import org.springframework.util.SocketUtils;
+import reactor.core.Environment;
+import reactor.io.encoding.StandardCodecs;
+import reactor.net.netty.udp.NettyDatagramServer;
+import reactor.net.udp.DatagramServer;
+import reactor.net.udp.spec.DatagramServerSpec;
+import reactor.spring.context.config.EnableReactor;
 
 /**
  * Created by marcel on 25-09-15.
  */
 @Configuration
 @EnableConfigurationProperties(UdpProducerConfiguration.UdpProducerConfigurationProperties.class)
+@EnableReactor
 public class UdpProducerConfiguration {
     private static final Logger log = LoggerFactory.getLogger(UdpProducerConfiguration.class);
 
@@ -54,6 +62,22 @@ public class UdpProducerConfiguration {
         int port;
 
     }
+
+
+    @Bean
+    public DatagramServer<byte[], byte[]> datagramServer(Environment env) throws InterruptedException {
+
+        final DatagramServer<byte[], byte[]> server = new DatagramServerSpec<byte[], byte[]>(NettyDatagramServer.class)
+                .env(env)
+                .listen(udpProducerConfigurationProperties.port)
+                .codec(StandardCodecs.BYTE_ARRAY_CODEC)
+                .consumeInput(bytes -> log.info("received(" + bytes.length + "): " + new String(bytes)))
+                .get();
+
+        server.start().await();
+        return server;
+    }
+
 
 
 }

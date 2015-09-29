@@ -1,0 +1,27 @@
+rabbitblack:
+    image: rabbitmq:management
+    environment:
+        RABBITMQ_NODENAME: rabbitblack
+    hostname: rabbit_black
+    # domainname: domain.lan
+    volumes:
+        - ./rabbit_black/lib:/var/lib/rabbitmq
+        - ./rabbit_black/log:/var/log/rabbitmq
+    ports:
+        - "5673:5672"
+        - "15673:15672"
+        - "25673:25672"
+
+rabbitred:
+    image: rabbitmq:management
+    environment:
+        RABBITMQ_NODENAME: rabbitred
+    hostname: rabbit_red
+    # domainname: domain.lan
+    volumes:
+        - ./rabbit_red/lib:/var/lib/rabbitmq
+        - ./rabbit_red/log:/var/log/rabbitmq
+    ports:
+        - "5674:5672"
+        - "15674:15672"
+        - "25674:25672"
