@@ -3,6 +3,7 @@ package nl.maatkamp.datadiode.black.configuration.rabbitmq;
 import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.rabbitmq.client.impl.AMQConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
@@ -44,32 +45,12 @@ public class RabbitmqConfiguration implements MessageListener {
     }
 
     @Bean
-    public ConnectionFactory connectionFactory() {
-        CachingConnectionFactory connectionFactory =
-                new CachingConnectionFactory(environment.getProperty("spring.rabbitmq.host"));
-
-        connectionFactory.setHost(environment.getProperty("spring.rabbitmq.host"));
-        connectionFactory.setPort(environment.getProperty("spring.rabbitmq.port", Integer.class));
-        connectionFactory.setUsername(environment.getProperty("spring.rabbitmq.username"));
-        connectionFactory.setPassword(environment.getProperty("spring.rabbitmq.password"));
-
-        log.info("rabbitmq(" + connectionFactory.getHost() + ":" + connectionFactory.getPort() + ").channelCacheSize(" + connectionFactory.getChannelCacheSize() + ")");
-
+    com.rabbitmq.client.ConnectionFactory rabbitConnectionFactory() {
+        com.rabbitmq.client.ConnectionFactory connectionFactory = new com.rabbitmq.client.ConnectionFactory();
+        connectionFactory.setClientProperties(AMQConnection.defaultClientProperties());
+        connectionFactory.setRequestedFrameMax(1024);
         return connectionFactory;
     }
-
-    @Bean
-    public AmqpAdmin amqpAdmin() {
-        AmqpAdmin amqpAdmin = new RabbitAdmin(connectionFactory());
-        return amqpAdmin;
-    }
-
-    @Bean
-    public RabbitTemplate rabbitTemplate() {
-        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory());
-        return rabbitTemplate;
-    }
-
 
     @Autowired
     AnnotationConfigApplicationContext context;
@@ -99,6 +80,7 @@ public class RabbitmqConfiguration implements MessageListener {
         );
         return rabbitManagementTemplate;
     }
+
 
     @Bean
     Queue queue() {
