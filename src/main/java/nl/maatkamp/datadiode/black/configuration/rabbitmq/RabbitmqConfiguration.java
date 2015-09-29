@@ -7,8 +7,10 @@ import com.rabbitmq.client.impl.AMQConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.connection.RabbitConnectionFactoryBean;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitManagementTemplate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -16,7 +18,10 @@ import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;
 import org.springframework.amqp.support.converter.DefaultClassMapper;
 import org.springframework.amqp.support.converter.JsonMessageConverter;
+import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.boot.autoconfigure.amqp.RabbitProperties;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,14 +37,14 @@ import javax.annotation.PostConstruct;
  * Created by marcel on 23-09-15.
  */
 @Configuration
-public class RabbitmqConfiguration implements MessageListener {
+public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor {
     private static final Logger log = LoggerFactory.getLogger(RabbitmqConfiguration.class);
 
     final static String queueName = "spring-boot";
 
 
     @Bean
-    public DefaultClassMapper defaultClassMapper() {
+    DefaultClassMapper defaultClassMapper() {
         DefaultClassMapper defaultClassMapper = new DefaultClassMapper();
         return defaultClassMapper;
     }
@@ -50,6 +55,43 @@ public class RabbitmqConfiguration implements MessageListener {
         connectionFactory.setClientProperties(AMQConnection.defaultClientProperties());
         connectionFactory.setRequestedFrameMax(1024);
         return connectionFactory;
+    }
+
+    // org.springframework.boot.autoconfigure.amqp.RabbitAnnotationDrivenConfiguration
+    // org.springframework.amqp.rabbit.config.internalRabbitListenerEndpointRegistry
+    // org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+    // org.springframework.boot.autoconfigure.amqp.RabbitProperties
+    // org.springframework.amqp.rabbit.annotation.RabbitBootstrapConfiguration
+
+    // RabbitListenerAnnotationBeanPostProcessor
+
+    // RabbitListenerEndpointRegistry
+    // * <p>Contrary to {@link MessageListenerContainer}s created manually, listener
+    // * containers managed by registry are not beans in the application context and
+    // * are not candidates for autowiring. Use {@link #getListenerContainers()} if
+    //         * you need to access this registry's listener containers for management purposes.
+    //         * If you need to access to a specific message listener container, use
+    // * {@link #getListenerContainer(String)} with the id of the endpoint.
+
+
+    @Bean
+    SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            ConnectionFactory connectionFactory, RabbitProperties config) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+
+        return factory;
+    }
+
+    @Bean
+    RabbitConnectionFactoryBean rabbitConnectionFactoryBean() {
+        RabbitConnectionFactoryBean rabbitConnectionFactoryBean = new RabbitConnectionFactoryBean();
+        rabbitConnectionFactoryBean.setClientProperties(AMQConnection.defaultClientProperties());
+
+        rabbitConnectionFactoryBean.setRequestedFrameMax(1024);
+        rabbitConnectionFactoryBean.setUseSSL(true);
+
+        return rabbitConnectionFactoryBean;
     }
 
     @Autowired
@@ -78,6 +120,7 @@ public class RabbitmqConfiguration implements MessageListener {
                 environment.getProperty("spring.rabbitmq.username"),
                 environment.getProperty("spring.rabbitmq.password")
         );
+        log.info("exchanges: " + rabbitManagementTemplate.getClient().getExchanges());
         return rabbitManagementTemplate;
     }
 
@@ -110,5 +153,17 @@ public class RabbitmqConfiguration implements MessageListener {
         String body = new String(message.getBody());
         log.info("body("+body.length()+"): (" + body + ")..");
         unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(message.getBody()));
+    }
+
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+        log.info("postProcessBeforeInitialization: bean(" + beanName + ")");
+        return bean;
+
+    }
+
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+        return bean;
     }
 }
