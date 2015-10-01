@@ -57,6 +57,8 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         return connectionFactory;
     }
 
+
+
     // org.springframework.boot.autoconfigure.amqp.RabbitAnnotationDrivenConfiguration
     // org.springframework.amqp.rabbit.config.internalRabbitListenerEndpointRegistry
     // org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
@@ -74,6 +76,27 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     // * {@link #getListenerContainer(String)} with the id of the endpoint.
 
 
+    // org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.createBareConnection() {
+    //   connection = new SimpleConnection(this.rabbitConnectionFactory.newConnection(this.executorService, this.addresses), this.closeTimeout) ->
+
+    // com.rabbitmq.client.ConnectionFactory
+    //      private int requestedFrameMax = DEFAULT_FRAME_MAX;
+    //   public void setRequestedFrameMax(int requestedFrameMax) {this.requestedFrameMax = requestedFrameMax;}
+    //   newConnection(ExecutorService executor, Address[] addrs) {
+    //   ..
+    //   ConnectionParams params = params(executor);
+    //   AMQConnection conn = new AMQConnection(params, handler);
+    // }
+
+    // com.rabbitmq.client.impl.AMQConnection():
+    //          this.requestedFrameMax = params.getRequestedFrameMax();
+
+    // int channelMax = negotiateChannelMax(this.requestedChannelMax,connTune.getChannelMax());
+    //  _channelManager = instantiateChannelManager(channelMax, threadFactory);
+    //  int frameMax = negotiatedMaxValue(this.requestedFrameMax,connTune.getFrameMax());
+    //  this._frameMax = frameMax;
+
+
     @Bean
     SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory, RabbitProperties config) {
@@ -84,7 +107,22 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     }
 
     @Bean
-    RabbitConnectionFactoryBean rabbitConnectionFactoryBean() {
+    public ConnectionFactory connectionFactory() {
+        CachingConnectionFactory connectionFactory =
+                new CachingConnectionFactory(environment.getProperty("spring.rabbitmq.host"));
+
+        connectionFactory.setHost(environment.getProperty("spring.rabbitmq.host"));
+        connectionFactory.setPort(environment.getProperty("spring.rabbitmq.port", Integer.class));
+        connectionFactory.setUsername(environment.getProperty("spring.rabbitmq.username"));
+        connectionFactory.setPassword(environment.getProperty("spring.rabbitmq.password"));
+
+        log.info("rabbitmq(" + connectionFactory.getHost() + ":" + connectionFactory.getPort() + ").channelCacheSize(" + connectionFactory.getChannelCacheSize() + ")");
+
+        return connectionFactory;
+    }
+
+    @Bean
+    RabbitConnectionFactoryBean clientConnectionFactory() {
         RabbitConnectionFactoryBean rabbitConnectionFactoryBean = new RabbitConnectionFactoryBean();
         rabbitConnectionFactoryBean.setClientProperties(AMQConnection.defaultClientProperties());
 
