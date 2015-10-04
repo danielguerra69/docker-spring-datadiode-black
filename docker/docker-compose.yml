@@ -1,15 +1,19 @@
-rabbitblack:
-    image: rabbitmq:management
-    environment:
-        RABBITMQ_NODENAME: rabbitblack
-    hostname: rabbit_black
-    volumes:
-        - ./rabbit_black/lib:/var/lib/rabbitmq
-        - ./rabbit_black/log:/var/log/rabbitmq
-    ports:
-        - "5673:5672"
-        - "15673:15672"
-        - "25673:25672"
+# https://docs.clusterhq.com/en/1.4.0/labs/compose.html
+rabbitblackexternal:
+  # image: rabbitmq:management
+  build: rabbitmq_frame_max/
+
+  environment:
+    RABBITMQ_NODENAME: rabbitblack
+  hostname: rabbit_black
+  # volume_driver: flocker
+  # volumes:
+  #   - ./rabbit_black/lib:/var/lib/rabbitmq/
+  #   - ./rabbit_black/log:/var/log/rabbitmq/
+  ports:
+    - "5673:5672"
+    - "15673:15672"
+    - "25673:25672"
 
 # [ $RABBITMQ_HOME/etc/rabbitmq/ |  /etc/rabbitmq ] /rabbitmq.config:
 # frame_max:
@@ -18,28 +22,31 @@ rabbitblack:
 # Setting a larger value may improve throughput; setting a smaller value may improve latency.
 # Default: 131072
 
- rabbitblackinternal:
-     image: rabbitmq:management
-     environment:
-         RABBITMQ_NODENAME: rabbitblackinternal
-     hostname: rabbit_black_internal
-     volumes:
-         - ./rabbit_black_internal/lib:/var/lib/rabbitmq
-         - ./rabbit_black_internal/log:/var/log/rabbitmq
-     ports:
-         - "5674:5672"
-         - "15674:15672"
-         - "25674:25672"
+rabbitblackinternal:
+  # image: rabbitmq:management
+  build: rabbitmq_frame_max/
+  environment:
+    RABBITMQ_NODENAME: rabbitblackinternal
+  hostname: rabbit_black_internal
+  # volume_driver: flocker
+  # volumes:
+  #   - ./rabbit_black_internal/lib:/var/lib/rabbitmq/
+  #   - ./rabbit_black_internal/log:/var/log/rabbitmq/
+  ports:
+    - "5674:5672"
+    - "15674:15672"
+    - "25674:25672"
 
 rabbitred:
-    image: rabbitmq:management
-    environment:
-        RABBITMQ_NODENAME: rabbitred
-    hostname: rabbit_red
-    volumes:
-        - ./rabbit_red/lib:/var/lib/rabbitmq
-        - ./rabbit_red/log:/var/log/rabbitmq
-    ports:
-        - "5675:5672"
-        - "15675:15672"
-        - "25675:25672"
+  image: rabbitmq:management
+  environment:
+    RABBITMQ_NODENAME: rabbitred
+  hostname: rabbit_red
+  # volume_driver: flocker
+  # volumes:
+  #   - ./rabbit_red/lib:/var/lib/rabbitmq/
+  #   - ./rabbit_red/log:/var/log/rabbitmq/
+  ports:
+    - "5675:5672"
+    - "15675:15672"
+    - "25675:25672"

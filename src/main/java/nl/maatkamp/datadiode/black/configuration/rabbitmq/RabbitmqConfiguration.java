@@ -49,13 +49,6 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         return defaultClassMapper;
     }
 
-    @Bean
-    com.rabbitmq.client.ConnectionFactory rabbitConnectionFactory() {
-        com.rabbitmq.client.ConnectionFactory connectionFactory = new com.rabbitmq.client.ConnectionFactory();
-        connectionFactory.setClientProperties(AMQConnection.defaultClientProperties());
-        connectionFactory.setRequestedFrameMax(1024);
-        return connectionFactory;
-    }
 
 
 
@@ -97,46 +90,31 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     //  this._frameMax = frameMax;
 
 
-    @Bean
-    SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
-            ConnectionFactory connectionFactory, RabbitProperties config) {
-        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
-        factory.setConnectionFactory(connectionFactory);
 
-        return factory;
-    }
 
     @Bean
-    public ConnectionFactory connectionFactory() {
-        CachingConnectionFactory connectionFactory =
-                new CachingConnectionFactory(environment.getProperty("spring.rabbitmq.host"));
-
-        connectionFactory.setHost(environment.getProperty("spring.rabbitmq.host"));
-        connectionFactory.setPort(environment.getProperty("spring.rabbitmq.port", Integer.class));
-        connectionFactory.setUsername(environment.getProperty("spring.rabbitmq.username"));
-        connectionFactory.setPassword(environment.getProperty("spring.rabbitmq.password"));
-
+    public ConnectionFactory connectionFactoryExternal() {
+        CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
+        connectionFactory.setHost(environment.getProperty("spring.datadiode.rabbitmq.external.host"));
+        connectionFactory.setPort(environment.getProperty("spring.datadiode.rabbitmq.external.port", Integer.class));
+        connectionFactory.setUsername(environment.getProperty("spring.datadiode.rabbitmq.external.username"));
+        connectionFactory.setPassword(environment.getProperty("spring.datadiode.rabbitmq.external.password"));
         log.info("rabbitmq(" + connectionFactory.getHost() + ":" + connectionFactory.getPort() + ").channelCacheSize(" + connectionFactory.getChannelCacheSize() + ")");
 
         return connectionFactory;
     }
 
-    @Bean
-    RabbitConnectionFactoryBean clientConnectionFactory() {
-        RabbitConnectionFactoryBean rabbitConnectionFactoryBean = new RabbitConnectionFactoryBean();
-        rabbitConnectionFactoryBean.setClientProperties(AMQConnection.defaultClientProperties());
-
-        rabbitConnectionFactoryBean.setRequestedFrameMax(1024);
-        rabbitConnectionFactoryBean.setUseSSL(true);
-
-        return rabbitConnectionFactoryBean;
-    }
 
     @Autowired
     AnnotationConfigApplicationContext context;
 
-    @Autowired
-    RabbitTemplate rabbitTemplate;
+    @Bean
+    RabbitTemplate rabbitTemplateExternal() {
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactoryExternal());
+        return rabbitTemplate;
+    }
+
+
 
     @Autowired
     Environment environment;
@@ -150,13 +128,13 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     // https://github.com/spring-projects/spring-integration/blob/master/spring-integration-ip/src/main/java/org/springframework/integration/ip/config/UdpOutboundChannelAdapterParser.java
     @Bean
     RabbitManagementTemplate rabbitManagementTemplate() {
-        log.info("template: " + rabbitTemplate);
+        log.info("template: " + rabbitTemplateExternal());
 
 
         RabbitManagementTemplate rabbitManagementTemplate = new RabbitManagementTemplate(
-                "http://"+environment.getProperty("spring.rabbitmq.host")+":1"+environment.getProperty("spring.rabbitmq.port", Integer.class)+"/api/",
-                environment.getProperty("spring.rabbitmq.username"),
-                environment.getProperty("spring.rabbitmq.password")
+                "http://"+environment.getProperty("spring.datadiode.rabbitmq.external.host")+":1"+environment.getProperty("spring.datadiode.rabbitmq.external.port", Integer.class)+"/api/",
+                environment.getProperty("spring.datadiode.rabbitmq.external.username"),
+                environment.getProperty("spring.datadiode.rabbitmq.external.password")
         );
         log.info("exchanges: " + rabbitManagementTemplate.getClient().getExchanges());
         return rabbitManagementTemplate;
@@ -179,9 +157,9 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     }
 
     @Bean
-    SimpleMessageListenerContainer container(ConnectionFactory connectionFactory) {
+    SimpleMessageListenerContainer simpleMessageListenerContainerExternal() {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
-        container.setConnectionFactory(connectionFactory);
+        container.setConnectionFactory(connectionFactoryExternal());
         container.setQueueNames(queueName);
         container.setMessageListener(this);
         return container;

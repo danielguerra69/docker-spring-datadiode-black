@@ -29,6 +29,7 @@ public class UdpProducerConfiguration {
 
     @Autowired
     UdpProducerConfigurationProperties udpProducerConfigurationProperties;
+
     @Bean
     UnicastSendingMessageHandler unicastSendingMessageHandler() {
 

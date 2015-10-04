@@ -142,13 +142,16 @@ public class SocketFrameHandler implements FrameHandler {
         synchronized (_inputStream) {
             Frame frame = Frame.readFrom(_inputStream);
             if(frame!=null) {
-                log.info("frame: " + frame + ": " + new String(frame.getPayload()));
+                log.info("frame[type("+frame.type+")/channel("+frame.channel+")/addr("+this.getAddress()+":"+this.getPort()+")/locAddr("+this.getLocalAddress()+":"+this.getLocalPort()+")]: " + frame + ": " + new String(frame.getPayload()));
             }
             return frame;
         }
     }
 
     public void writeFrame(Frame frame) throws IOException {
+        if(frame!=null) {
+            log.info("frame[type("+frame.type+")/channel("+frame.channel+")/addr("+this.getAddress()+":"+this.getPort()+")/locAddr("+this.getLocalAddress()+":"+this.getLocalPort()+")]: " + frame + ": " + new String(frame.getPayload()));
+        }
         synchronized (_outputStream) {
             frame.writeTo(_outputStream);
         }
