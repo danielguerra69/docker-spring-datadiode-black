@@ -1,27 +1,17 @@
 package nl.maatkamp.datadiode.black.configuration.rabbitmq;
 
-import com.fasterxml.jackson.databind.DeserializationConfig;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.rabbitmq.client.impl.AMQConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
-import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.connection.RabbitConnectionFactoryBean;
-import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitManagementTemplate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
-import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;
 import org.springframework.amqp.support.converter.DefaultClassMapper;
-import org.springframework.amqp.support.converter.JsonMessageConverter;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
-import org.springframework.boot.autoconfigure.amqp.RabbitProperties;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,25 +19,15 @@ import org.springframework.core.env.Environment;
 import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
 import org.springframework.messaging.support.GenericMessage;
 
-
-
-import javax.annotation.PostConstruct;
-
 /**
  * Created by marcel on 23-09-15.
  */
 @Configuration
 public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor {
-    private static final Logger log = LoggerFactory.getLogger(RabbitmqConfiguration.class);
-
     final static String queueName = "spring-boot";
-
-
-    @Bean
-    DefaultClassMapper defaultClassMapper() {
-        DefaultClassMapper defaultClassMapper = new DefaultClassMapper();
-        return defaultClassMapper;
-    }
+    private static final Logger log = LoggerFactory.getLogger(RabbitmqConfiguration.class);
+    @Autowired
+    AnnotationConfigApplicationContext context;
 
 
 
@@ -88,9 +68,16 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     //  _channelManager = instantiateChannelManager(channelMax, threadFactory);
     //  int frameMax = negotiatedMaxValue(this.requestedFrameMax,connTune.getFrameMax());
     //  this._frameMax = frameMax;
+    @Autowired
+    Environment environment;
+    @Autowired
+    UnicastSendingMessageHandler unicastSendingMessageHandler;
 
-
-
+    @Bean
+    DefaultClassMapper defaultClassMapper() {
+        DefaultClassMapper defaultClassMapper = new DefaultClassMapper();
+        return defaultClassMapper;
+    }
 
     @Bean
     public ConnectionFactory connectionFactoryExternal() {
@@ -104,23 +91,11 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         return connectionFactory;
     }
 
-
-    @Autowired
-    AnnotationConfigApplicationContext context;
-
     @Bean
     RabbitTemplate rabbitTemplateExternal() {
         RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactoryExternal());
         return rabbitTemplate;
     }
-
-
-
-    @Autowired
-    Environment environment;
-
-    @Autowired
-    UnicastSendingMessageHandler unicastSendingMessageHandler;
 
     // https://github.com/spring-projects/spring-amqp/blob/master/spring-rabbit/src/test/java/org/springframework/amqp/rabbit/core/RabbitManagementTemplateTests.java
     // List<Exchange> list = this.template.getExchanges();
@@ -136,6 +111,7 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
                 environment.getProperty("spring.datadiode.rabbitmq.external.username"),
                 environment.getProperty("spring.datadiode.rabbitmq.external.password")
         );
+
         log.info("exchanges: " + rabbitManagementTemplate.getClient().getExchanges());
         return rabbitManagementTemplate;
     }

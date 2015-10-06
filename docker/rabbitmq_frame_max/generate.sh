@@ -1,2 +1,2 @@
 #!/bin/bash
-docker build -t . rabbitmq_max_frame:management
+docker build -t rabbitmq_max_frame/management .

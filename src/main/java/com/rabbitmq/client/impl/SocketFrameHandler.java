@@ -16,37 +16,31 @@
 
 package com.rabbitmq.client.impl;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.Socket;
-import java.net.SocketException;
-
 import com.rabbitmq.client.AMQP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.SocketException;
 
 /**
  * A socket-based frame handler.
  */
 
 public class SocketFrameHandler implements FrameHandler {
+    /**
+     * Time to linger before closing the socket forcefully.
+     */
+    public static final int SOCKET_CLOSING_TIMEOUT = 1;
     private static final Logger log = LoggerFactory.getLogger(SocketFrameHandler.class);
-
     /** The underlying socket */
     private final Socket _socket;
-
     /** Socket's inputstream - data from the broker - synchronized on */
     private final DataInputStream _inputStream;
-
     /** Socket's outputstream - data to the broker - synchronized on */
     private final DataOutputStream _outputStream;
-
-    /** Time to linger before closing the socket forcefully. */
-    public static final int SOCKET_CLOSING_TIMEOUT = 1;
 
     /**
      * @param socket the socket to use
@@ -79,16 +73,15 @@ public class SocketFrameHandler implements FrameHandler {
         return _socket.getLocalPort();
     }
 
+    public int getTimeout()
+            throws SocketException {
+        return _socket.getSoTimeout();
+    }
+
     public void setTimeout(int timeoutMs)
             throws SocketException
     {
         _socket.setSoTimeout(timeoutMs);
-    }
-
-    public int getTimeout()
-            throws SocketException
-    {
-        return _socket.getSoTimeout();
     }
 
     /**
@@ -141,16 +134,16 @@ public class SocketFrameHandler implements FrameHandler {
     public Frame readFrame() throws IOException {
         synchronized (_inputStream) {
             Frame frame = Frame.readFrom(_inputStream);
-            if(frame!=null) {
-                log.info("frame[type("+frame.type+")/channel("+frame.channel+")/addr("+this.getAddress()+":"+this.getPort()+")/locAddr("+this.getLocalAddress()+":"+this.getLocalPort()+")]: " + frame + ": " + new String(frame.getPayload()));
+            if(frame != null) {
+                log.info("readFrame: addr(" + this.getAddress() + ":" + this.getPort() + ")]: " + frame + ": " + new String(frame.getPayload()));
             }
             return frame;
         }
     }
 
     public void writeFrame(Frame frame) throws IOException {
-        if(frame!=null) {
-            log.info("frame[type("+frame.type+")/channel("+frame.channel+")/addr("+this.getAddress()+":"+this.getPort()+")/locAddr("+this.getLocalAddress()+":"+this.getLocalPort()+")]: " + frame + ": " + new String(frame.getPayload()));
+        if(frame != null) {
+            log.info("writeFrame: addr(" + this.getAddress() + ":" + this.getPort() + "))]: " + frame + ": " + new String(frame.getPayload()));
         }
         synchronized (_outputStream) {
             frame.writeTo(_outputStream);
