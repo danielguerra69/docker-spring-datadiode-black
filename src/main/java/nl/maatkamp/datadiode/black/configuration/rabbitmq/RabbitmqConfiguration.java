@@ -99,6 +99,7 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         connectionFactory.setPort(environment.getProperty("spring.datadiode.rabbitmq.internal.port", Integer.class));
         connectionFactory.setUsername(environment.getProperty("spring.datadiode.rabbitmq.internal.username"));
         connectionFactory.setPassword(environment.getProperty("spring.datadiode.rabbitmq.internal.password"));
+        connectionFactory.createConnection();
         log.info("rabbitmq(" + connectionFactory.getHost() + ":" + connectionFactory.getPort() + ").channelCacheSize(" + connectionFactory.getChannelCacheSize() + ")");
         return connectionFactory;
     }
