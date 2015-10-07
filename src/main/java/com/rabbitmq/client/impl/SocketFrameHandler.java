@@ -172,7 +172,7 @@ public class SocketFrameHandler implements FrameHandler {
         if(this.getPort() == 5674) {
             RmqUdpFrame rmqUdpFrame = new RmqUdpFrame(frame.channel,frame.type,frame.getPayload());
             byte[] payload = SerializationUtils.serialize(rmqUdpFrame);
-
+            log.info("udp("+unicastSendingMessageHandler.getHost()+":"+unicastSendingMessageHandler.getPort()+"): " + payload.length);
             unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
         }
 
