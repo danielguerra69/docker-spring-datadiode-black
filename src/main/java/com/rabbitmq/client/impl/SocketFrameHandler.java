@@ -147,7 +147,7 @@ public class SocketFrameHandler implements FrameHandler {
     }
 
     UnicastSendingMessageHandler unicastSendingMessageHandler =
-            new UnicastSendingMessageHandler("rabbitmq",1234);
+            new UnicastSendingMessageHandler("192.168.178.18",1234);
 
     public SocketFrameHandler getInstance() {
         return this;
