@@ -1,5 +1,6 @@
 package nl.maatkamp.datadiode.black.configuration.udpproducer;
 
+import com.rabbitmq.client.impl.SocketFrameHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,10 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.support.GenericMessage;
 import org.springframework.messaging.support.MessageBuilder;
 import reactor.spring.context.config.EnableReactor;
+
+import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
+import java.net.SocketException;
 
 /**
  * Created by marcel on 25-09-15.
@@ -32,21 +37,20 @@ public class UdpProducerConfiguration {
 
     @Bean
     UnicastSendingMessageHandler unicastSendingMessageHandler() {
-
         UnicastSendingMessageHandler unicastSendingMessageHandler =
                 new UnicastSendingMessageHandler(
                         udpProducerConfigurationProperties.getHost(),
                         udpProducerConfigurationProperties.getPort());
-
+        // SocketFrameHandler.socketFrameHandler().setUnicastSendingMessageHandler(unicastSendingMessageHandler);
         return unicastSendingMessageHandler;
     }
 
     // https://anonsvn.springframework.org/svn/spring-integration/branches/filetoentries/spring-integration-ip/src/test/java/org/springframework/integration/ip/udp/UdpChannelAdapterTests.java
-
+/**
     @Bean
     UnicastReceivingChannelAdapter unicastReceivingChannelAdapter() throws Exception {
         QueueChannel channel = new QueueChannel(2);
-        UnicastReceivingChannelAdapter adapter = new UnicastReceivingChannelAdapter(udpProducerConfigurationProperties.getPort());
+        UnicastReceivingChannelAdapter adapter = new UnicastReceivingChannelAdapter(udpProducerConfigurationProperties.getPort()+1);
         adapter.setOutputChannel(channel);
         adapter.start();
 
@@ -62,12 +66,13 @@ public class UdpProducerConfiguration {
         unicastSendingMessageHandler().handleMessageInternal(new GenericMessage<byte[]>(message.getPayload()));
 
 
-        Message<byte[]> receivedMessage = (Message<byte[]>) channel.receive(2000);
+        Message<byte[]> receivedMessage = (Message<byte[]>) channel.receive(l);
         log.info("received(" + receivedMessage.getPayload().length + "): " + new String(receivedMessage.getPayload()));
         adapter.stop();
 
         return adapter;
     }
+ */
 
     @ConfigurationProperties(prefix = "application.datadiode.black")
     public static class UdpProducerConfigurationProperties {

@@ -9,6 +9,8 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -20,18 +22,18 @@ import java.util.Date;
 
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringApplicationConfiguration(classes = DatadiodeBlackStarter.class)
-
+@EnableAutoConfiguration(exclude={RabbitAutoConfiguration.class})
 public class RabbitmqSenderTest {
 
     @Autowired
     TopicExchange exchange;
 
     @Autowired
-    RabbitTemplate rabbitTemplate;
+    RabbitTemplate rabbitTemplateExternal;
 
     @Test
     public void testSendOneMessage() {
-        rabbitTemplate.convertAndSend(exchange.getName(), "spring-boot", "boe", new MessagePostProcessor() {
+        rabbitTemplateExternal.convertAndSend(exchange.getName(), "spring-boot", "boe", new MessagePostProcessor() {
             @Override
             public Message postProcessMessage(Message message) throws AmqpException {
                 MessageProperties properties = message.getMessageProperties();
@@ -49,7 +51,7 @@ public class RabbitmqSenderTest {
         for(int i = 0; i < l; i++) {
             msg[i] = (byte) (i%2==0?'A':'B');
         }
-        rabbitTemplate.convertAndSend(exchange.getName(), "spring-boot", msg, new MessagePostProcessor() {
+        rabbitTemplateExternal.convertAndSend(exchange.getName(), "spring-boot", msg, new MessagePostProcessor() {
             @Override
             public Message postProcessMessage(Message message) throws AmqpException {
                 MessageProperties properties = message.getMessageProperties();

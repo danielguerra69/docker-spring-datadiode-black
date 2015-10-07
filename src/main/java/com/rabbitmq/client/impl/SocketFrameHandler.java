@@ -17,8 +17,15 @@
 package com.rabbitmq.client.impl;
 
 import com.rabbitmq.client.AMQP;
+import nl.maatkamp.datadiode.model.RmqUdpFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.GenericMessage;
+import org.springframework.util.SerializationUtils;
 
 import java.io.*;
 import java.net.InetAddress;
@@ -42,6 +49,8 @@ public class SocketFrameHandler implements FrameHandler {
     /** Socket's outputstream - data to the broker - synchronized on */
     private final DataOutputStream _outputStream;
 
+    static SocketFrameHandler socketFrameHandler;
+
     /**
      * @param socket the socket to use
      */
@@ -50,6 +59,12 @@ public class SocketFrameHandler implements FrameHandler {
 
         _inputStream = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
         _outputStream = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+
+        this.socketFrameHandler = this;
+    }
+
+    public static SocketFrameHandler socketFrameHandler() {
+        return socketFrameHandler;
     }
 
     public InetAddress getAddress() {
@@ -131,12 +146,20 @@ public class SocketFrameHandler implements FrameHandler {
         sendHeader(AMQP.PROTOCOL.MAJOR, AMQP.PROTOCOL.MINOR, AMQP.PROTOCOL.REVISION);
     }
 
+    UnicastSendingMessageHandler unicastSendingMessageHandler =
+            new UnicastSendingMessageHandler("rabbitmq",1234);
+
+    public SocketFrameHandler getInstance() {
+        return this;
+    }
+
     public Frame readFrame() throws IOException {
         synchronized (_inputStream) {
             Frame frame = Frame.readFrom(_inputStream);
             if(frame != null) {
                 log.info("readFrame: addr(" + this.getAddress() + ":" + this.getPort() + ")]: " + frame + ": " + new String(frame.getPayload()));
             }
+
             return frame;
         }
     }
@@ -145,6 +168,14 @@ public class SocketFrameHandler implements FrameHandler {
         if(frame != null) {
             log.info("writeFrame: addr(" + this.getAddress() + ":" + this.getPort() + "))]: " + frame + ": " + new String(frame.getPayload()));
         }
+
+        if(this.getPort() == 5674) {
+            RmqUdpFrame rmqUdpFrame = new RmqUdpFrame(frame.channel,frame.type,frame.getPayload());
+            byte[] payload = SerializationUtils.serialize(rmqUdpFrame);
+
+            unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
+        }
+
         synchronized (_outputStream) {
             frame.writeTo(_outputStream);
         }

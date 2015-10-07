@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitManagementTemplate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
@@ -70,6 +71,7 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     //  this._frameMax = frameMax;
     @Autowired
     Environment environment;
+
     @Autowired
     UnicastSendingMessageHandler unicastSendingMessageHandler;
 
@@ -87,7 +89,17 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         connectionFactory.setUsername(environment.getProperty("spring.datadiode.rabbitmq.external.username"));
         connectionFactory.setPassword(environment.getProperty("spring.datadiode.rabbitmq.external.password"));
         log.info("rabbitmq(" + connectionFactory.getHost() + ":" + connectionFactory.getPort() + ").channelCacheSize(" + connectionFactory.getChannelCacheSize() + ")");
+        return connectionFactory;
+    }
 
+    @Bean
+    public ConnectionFactory connectionFactoryInternal() {
+        CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
+        connectionFactory.setHost(environment.getProperty("spring.datadiode.rabbitmq.internal.host"));
+        connectionFactory.setPort(environment.getProperty("spring.datadiode.rabbitmq.internal.port", Integer.class));
+        connectionFactory.setUsername(environment.getProperty("spring.datadiode.rabbitmq.internal.username"));
+        connectionFactory.setPassword(environment.getProperty("spring.datadiode.rabbitmq.internal.password"));
+        log.info("rabbitmq(" + connectionFactory.getHost() + ":" + connectionFactory.getPort() + ").channelCacheSize(" + connectionFactory.getChannelCacheSize() + ")");
         return connectionFactory;
     }
 
@@ -97,6 +109,24 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         return rabbitTemplate;
     }
 
+    @Bean
+    RabbitTemplate rabbitTemplateInternal() {
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactoryInternal());
+        return rabbitTemplate;
+    }
+
+    @Bean
+    RabbitAdmin rabbitAdminExternal() {
+        RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactoryExternal());
+        return rabbitAdmin;
+    }
+
+    @Bean
+    RabbitAdmin rabbitAdminInternal() {
+        RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactoryInternal());
+        return rabbitAdmin;
+    }
+
     // https://github.com/spring-projects/spring-amqp/blob/master/spring-rabbit/src/test/java/org/springframework/amqp/rabbit/core/RabbitManagementTemplateTests.java
     // List<Exchange> list = this.template.getExchanges();
     // public static BrokerRunning brokerAndManagementRunning = BrokerRunning.isBrokerAndManagementRunning();
@@ -104,14 +134,11 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     @Bean
     RabbitManagementTemplate rabbitManagementTemplate() {
         log.info("template: " + rabbitTemplateExternal());
-
-
         RabbitManagementTemplate rabbitManagementTemplate = new RabbitManagementTemplate(
                 "http://"+environment.getProperty("spring.datadiode.rabbitmq.external.host")+":1"+environment.getProperty("spring.datadiode.rabbitmq.external.port", Integer.class)+"/api/",
                 environment.getProperty("spring.datadiode.rabbitmq.external.username"),
                 environment.getProperty("spring.datadiode.rabbitmq.external.password")
         );
-
         log.info("exchanges: " + rabbitManagementTemplate.getClient().getExchanges());
         return rabbitManagementTemplate;
     }
@@ -141,10 +168,19 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         return container;
     }
 
+
+
     public void onMessage(Message message) {
         String body = new String(message.getBody());
         log.info("body("+body.length()+"): (" + body + ")..");
-        unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(message.getBody()));
+
+        // create exchange
+        rabbitAdminInternal().declareExchange(exchange());
+
+        // send other rmq
+        rabbitTemplateInternal().convertAndSend(exchange().getName(),"spring-boot", body);
+
+        // unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(message.getBody()));
     }
 
     @Override
