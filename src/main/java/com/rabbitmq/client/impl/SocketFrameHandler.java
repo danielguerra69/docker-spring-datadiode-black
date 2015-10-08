@@ -20,10 +20,7 @@ import com.rabbitmq.client.AMQP;
 import nl.maatkamp.datadiode.model.RmqUdpFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.support.GenericMessage;
 import org.springframework.util.SerializationUtils;
 
@@ -41,15 +38,23 @@ public class SocketFrameHandler implements FrameHandler {
      * Time to linger before closing the socket forcefully.
      */
     public static final int SOCKET_CLOSING_TIMEOUT = 1;
+    public static final String HOST = "localhost";
+
+    // public static final String HOST = "192.168.178.18";
+    public static final int PORT = 1234;
+    public static final int RMQ_INSIDE = 5674;
+    public static final int WAIT_MILLIS = 50;
     private static final Logger log = LoggerFactory.getLogger(SocketFrameHandler.class);
+    static SocketFrameHandler socketFrameHandler;
+    static int index = 0;
     /** The underlying socket */
     private final Socket _socket;
     /** Socket's inputstream - data from the broker - synchronized on */
     private final DataInputStream _inputStream;
     /** Socket's outputstream - data to the broker - synchronized on */
     private final DataOutputStream _outputStream;
-
-    static SocketFrameHandler socketFrameHandler;
+    UnicastSendingMessageHandler unicastSendingMessageHandler =
+            new UnicastSendingMessageHandler(HOST, PORT);
 
     /**
      * @param socket the socket to use
@@ -146,9 +151,6 @@ public class SocketFrameHandler implements FrameHandler {
         sendHeader(AMQP.PROTOCOL.MAJOR, AMQP.PROTOCOL.MINOR, AMQP.PROTOCOL.REVISION);
     }
 
-    UnicastSendingMessageHandler unicastSendingMessageHandler =
-            new UnicastSendingMessageHandler("192.168.178.18",1234);
-
     public SocketFrameHandler getInstance() {
         return this;
     }
@@ -157,7 +159,7 @@ public class SocketFrameHandler implements FrameHandler {
         synchronized (_inputStream) {
             Frame frame = Frame.readFrom(_inputStream);
             if(frame != null) {
-                log.info("readFrame: addr(" + this.getAddress() + ":" + this.getPort() + ")]: " + frame + ": " + new String(frame.getPayload()));
+                log.debug("readFrame: addr(" + this.getAddress() + ":" + this.getPort() + ")]: " + frame + ": " + new String(frame.getPayload()));
             }
 
             return frame;
@@ -166,14 +168,22 @@ public class SocketFrameHandler implements FrameHandler {
 
     public void writeFrame(Frame frame) throws IOException {
         if(frame != null) {
-            log.info("writeFrame: addr(" + this.getAddress() + ":" + this.getPort() + "))]: " + frame + ": " + new String(frame.getPayload()));
+            log.debug("writeFrame: addr(" + this.getAddress() + ":" + this.getPort() + "))]: " + frame + ": " + new String(frame.getPayload()));
         }
 
-        if(this.getPort() == 5674) {
-            RmqUdpFrame rmqUdpFrame = new RmqUdpFrame(frame.channel,frame.type,frame.getPayload());
+        if (this.getPort() == RMQ_INSIDE) {
+            RmqUdpFrame rmqUdpFrame = new RmqUdpFrame(++index, frame.channel, frame.type, frame.getPayload());
             byte[] payload = SerializationUtils.serialize(rmqUdpFrame);
-            log.info("udp("+unicastSendingMessageHandler.getHost()+":"+unicastSendingMessageHandler.getPort()+"): " + payload.length);
-            unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
+
+            log.info("rmq.frame.index(" + rmqUdpFrame.getIndex() + ").type(" + frame.type + ").channel(" + frame.channel + ").payload(" + frame.getPayload().length + ")");
+
+            try {
+                unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
+                Thread.sleep(WAIT_MILLIS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
         }
 
         synchronized (_outputStream) {

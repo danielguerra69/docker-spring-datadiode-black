@@ -18,7 +18,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
-import org.springframework.messaging.support.GenericMessage;
 
 /**
  * Created by marcel on 23-09-15.
@@ -88,6 +87,7 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         connectionFactory.setPort(environment.getProperty("spring.datadiode.rabbitmq.external.port", Integer.class));
         connectionFactory.setUsername(environment.getProperty("spring.datadiode.rabbitmq.external.username"));
         connectionFactory.setPassword(environment.getProperty("spring.datadiode.rabbitmq.external.password"));
+        connectionFactory.createConnection();
         log.info("rabbitmq(" + connectionFactory.getHost() + ":" + connectionFactory.getPort() + ").channelCacheSize(" + connectionFactory.getChannelCacheSize() + ")");
         return connectionFactory;
     }
@@ -151,13 +151,13 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     }
 
     @Bean
-    TopicExchange exchange() {
+    Exchange exchange() {
         return new TopicExchange("spring-boot-exchange");
     }
 
     @Bean
     Binding binding(Queue queue, TopicExchange exchange) {
-        return BindingBuilder.bind(queue).to(exchange).with(queueName);
+        return BindingBuilder.bind(queue).to(exchange).with("");
     }
 
     @Bean
@@ -179,7 +179,7 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         rabbitAdminInternal().declareExchange(exchange());
 
         // send other rmq
-        rabbitTemplateInternal().convertAndSend(exchange().getName(),"spring-boot", body);
+        rabbitTemplateInternal().convertAndSend(exchange().getName(), "", body);
 
         // unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(message.getBody()));
     }

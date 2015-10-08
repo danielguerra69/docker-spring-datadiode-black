@@ -7,13 +7,24 @@ import java.io.Serializable;
  */
 public class RmqUdpFrame implements Serializable {
 
+    int index;
     int channel;
     int type;
+    byte[] payload;
 
-    public RmqUdpFrame(int channel, int type, byte[] payload) {
+    public RmqUdpFrame(int index, int channel, int type, byte[] payload) {
+        this.index = index;
         this.channel = channel;
         this.type = type;
         this.payload = payload;
+    }
+
+    public int getIndex() {
+        return index;
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
     }
 
     public byte[] getPayload() {
@@ -39,6 +50,4 @@ public class RmqUdpFrame implements Serializable {
     public void setChannel(int channel) {
         this.channel = channel;
     }
-
-    byte[] payload;
 }
