@@ -1,0 +1,20 @@
+var amqp = require('amqp');
+var connection = amqp.createConnection({ host: "rabbitmq", port: 5673 });
+var count = 1;
+
+connection.on('ready', function () {
+    connection.exchange("spring-boot-exchange", options={durable:true, autoDelete:false}, function(exchange) {
+
+        var sendMessage = function(exchange, payload) {
+            console.log('about to publish')
+            var encoded_payload = JSON.stringify(payload);
+            exchange.publish('', encoded_payload, {})
+        }
+
+        setInterval( function() {
+            var test_message = 'TEST '+count
+            sendMessage(exchange, test_message)
+            count += 1;
+        }, 2000)
+    })
+})
