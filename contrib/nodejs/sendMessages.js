@@ -6,15 +6,15 @@ connection.on('ready', function () {
     connection.exchange("spring-boot-exchange", options={durable:true, autoDelete:false}, function(exchange) {
 
         var sendMessage = function(exchange, payload) {
-            console.log('about to publish')
             var encoded_payload = JSON.stringify(payload);
             exchange.publish('', encoded_payload, {})
         }
 
         setInterval( function() {
             var test_message = 'TEST '+count
+            console.log('send ' + count + " ..")
             sendMessage(exchange, test_message)
             count += 1;
-        }, 2000)
+        }, 1000)
     })
 })
