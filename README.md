@@ -6,7 +6,7 @@ Reference Implementation of AMQP with RabbitMQ over a data diode where messages 
 
 Start rabbitmq
 ```
-cd contrib\rabbitmq
+cd contrib/rabbitmq
 docker-compose up
 ```
 
