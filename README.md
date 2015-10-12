@@ -1,3 +1,17 @@
-# docker-spring-datadiode-black
+# AMQP over data diode (outside)
 
-Reference Implementation of RabbitMQ over a data diode where messages are as big as udp packets to avoid the problem of out-of-order arriving packets.
+Reference Implementation of AMQP with RabbitMQ over a data diode where messages are as big as udp packets to avoid the problem of out-of-order arriving packets.
+
+# Start 
+
+Start rabbitmq
+```
+cd contrib\rabbitmq
+docker-compose up
+```
+
+Start oudside 
+```
+gradle run
+```
+
