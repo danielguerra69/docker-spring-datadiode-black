@@ -175,13 +175,8 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         String body = new String(message.getBody());
         log.info("body("+body.length()+"): (" + body + ")..");
 
-        // create exchange
-        rabbitAdminInternal().declareExchange(exchange());
-
         // send other rmq
         rabbitTemplateInternal().convertAndSend(exchange().getName(), "", body);
-
-        // unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(message.getBody()));
     }
 
     @Override

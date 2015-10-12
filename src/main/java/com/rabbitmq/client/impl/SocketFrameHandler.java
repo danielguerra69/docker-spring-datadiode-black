@@ -43,7 +43,7 @@ public class SocketFrameHandler implements FrameHandler {
     // public static final String HOST = "192.168.178.18";
     public static final int PORT = 1234;
     public static final int RMQ_INSIDE = 5674;
-    public static final int WAIT_MILLIS = 50;
+    public static final int WAIT_MILLIS = 150;
     private static final Logger log = LoggerFactory.getLogger(SocketFrameHandler.class);
     static SocketFrameHandler socketFrameHandler;
     static int index = 0;
@@ -161,6 +161,8 @@ public class SocketFrameHandler implements FrameHandler {
             if(frame != null) {
                 log.debug("readFrame: addr(" + this.getAddress() + ":" + this.getPort() + ")]: " + frame + ": " + new String(frame.getPayload()));
             }
+            log.info("rmq.frame.channel(" + frame.channel + ").type(" + frame.type + ").payload(" + frame.getPayload().length + ")");
+
 
             return frame;
         }
@@ -175,7 +177,7 @@ public class SocketFrameHandler implements FrameHandler {
             RmqUdpFrame rmqUdpFrame = new RmqUdpFrame(++index, frame.channel, frame.type, frame.getPayload());
             byte[] payload = SerializationUtils.serialize(rmqUdpFrame);
 
-            log.info("rmq.frame.index(" + rmqUdpFrame.getIndex() + ").type(" + frame.type + ").channel(" + frame.channel + ").payload(" + frame.getPayload().length + ")");
+            log.info("rmq.frame.index(" + rmqUdpFrame.getIndex() + ").channel(" + frame.channel + ").type(" + frame.type + ").payload(" + frame.getPayload().length + ")");
 
             try {
                 unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
