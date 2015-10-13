@@ -1,6 +1,7 @@
 package nl.maatkamp.datadiode.black.configuration.rabbitmq;
 
 import com.rabbitmq.client.Channel;
+import nl.maatkamp.datadiode.model.MessageWithPayload;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,8 +22,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
+import org.springframework.messaging.support.GenericMessage;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.util.SerializationUtils;
 
 import java.util.Arrays;
 import java.util.List;
@@ -34,7 +37,6 @@ import java.util.List;
 @EnableScheduling
 public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanPostProcessor {
 
-    final static String queueName = "spring-boot";
     private static final Logger log = LoggerFactory.getLogger(RabbitmqConfiguration.class);
 
     @Autowired
@@ -66,7 +68,7 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
     }
 
     @Bean
-    public ConnectionFactory connectionFactoryExternal() {
+    public ConnectionFactory connectionFactory() {
         CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
         connectionFactory.setHost(environment.getProperty("spring.datadiode.rabbitmq.external.host"));
         connectionFactory.setPort(environment.getProperty("spring.datadiode.rabbitmq.external.port", Integer.class));
@@ -77,41 +79,21 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
         return connectionFactory;
     }
 
-    @Bean
-    public ConnectionFactory connectionFactoryInternal() {
-        CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
-        connectionFactory.setHost(environment.getProperty("spring.datadiode.rabbitmq.internal.host"));
-        connectionFactory.setPort(environment.getProperty("spring.datadiode.rabbitmq.internal.port", Integer.class));
-        connectionFactory.setUsername(environment.getProperty("spring.datadiode.rabbitmq.internal.username"));
-        connectionFactory.setPassword(environment.getProperty("spring.datadiode.rabbitmq.internal.password"));
-        connectionFactory.createConnection();
-        log.info("rabbitmq(" + connectionFactory.getHost() + ":" + connectionFactory.getPort() + ").channelCacheSize(" + connectionFactory.getChannelCacheSize() + ")");
-        return connectionFactory;
-    }
+
 
     @Bean
-    RabbitTemplate rabbitTemplateExternal() {
-        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactoryExternal());
+    RabbitTemplate rabbitTemplate() {
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory());
         return rabbitTemplate;
     }
 
-    @Bean
-    RabbitTemplate rabbitTemplateInternal() {
-        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactoryInternal());
-        return rabbitTemplate;
-    }
 
     @Bean
-    RabbitAdmin rabbitAdminExternal() {
-        RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactoryExternal());
+    RabbitAdmin rabbitAdmin() {
+        RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactory());
         return rabbitAdmin;
     }
 
-    @Bean
-    RabbitAdmin rabbitAdminInternal() {
-        RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactoryInternal());
-        return rabbitAdmin;
-    }
 
     // https://github.com/spring-projects/spring-amqp/blob/master/spring-rabbit/src/test/java/org/springframework/amqp/rabbit/core/RabbitManagementTemplateTests.java
     // List<Exchange> list = this.template.getExchanges();
@@ -119,7 +101,7 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
     // https://github.com/spring-projects/spring-integration/blob/master/spring-integration-ip/src/main/java/org/springframework/integration/ip/config/UdpOutboundChannelAdapterParser.java
     @Bean
     RabbitManagementTemplate rabbitManagementTemplate() {
-        log.info("template: " + rabbitTemplateExternal());
+        log.info("template: " + rabbitTemplate());
         RabbitManagementTemplate rabbitManagementTemplate = new RabbitManagementTemplate(
                 "http://"+environment.getProperty("spring.datadiode.rabbitmq.external.host")+":1"+environment.getProperty("spring.datadiode.rabbitmq.external.port", Integer.class)+"/api/",
                 environment.getProperty("spring.datadiode.rabbitmq.external.username"),
@@ -133,87 +115,55 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
     void checkForNewExchanges() {
 
         for (Exchange exchange : rabbitManagementTemplate().getExchanges()) {
-            log.info("exchange(" + exchange.getName() + "/" + exchange.getType() + ").isDurable(" + exchange.isDurable() + ").isAutoDelete(" + exchange.isAutoDelete() + ").args(" + exchange.getArguments() + ")");
-            String queueName = exchange.getName() + DATA_DIODE_QUEUENAME_SUFFIX;
+            if (exchange.getName() != null && exchange.getName() != "" && !standardExchanges.contains(exchange.getName())) {
+                // log.info("exchange(" + exchange.getName() + "/" + exchange.getType() + ").isDurable(" + exchange.isDurable() + ").isAutoDelete(" + exchange.isAutoDelete() + ").args(" + exchange.getArguments() + ")");
 
-            if (exchange.getName() != null && !standardExchanges.contains(exchange.getName())) {
+                String queueName = exchange.getName() + DATA_DIODE_QUEUENAME_SUFFIX;
+                Queue bindQueue = null;
+                boolean bindingExists = false;
+
                 for (Binding binding : rabbitManagementTemplate().getBindings()) {
                     if (binding.getExchange().equals(exchange.getName())) {
 
                         if (binding.getDestination().equals(queueName)) {
                             // binding exists, so queue exists
-
-                            log.info("binding exists: binding(" + binding.getExchange() + ").destination(" + binding.getDestination() + ").destinationType(" + binding.getDestinationType() + ").routingKey(" + binding.getRoutingKey() + ").isDestinationQueue(" + binding.isDestinationQueue() + ").args(" + binding.getArguments() + ")");
+                            bindingExists = true;
+                            // log.info("binding exists: binding(" + binding.getExchange() + ").destination(" + binding.getDestination() + ").destinationType(" + binding.getDestinationType() + ").routingKey(" + binding.getRoutingKey() + ").isDestinationQueue(" + binding.isDestinationQueue() + ").args(" + binding.getArguments() + ")");
                         } else {
-                            Queue bindQueue = null;
 
                             for (Queue queue : rabbitManagementTemplate().getQueues()) {
                                 // queue exists, bind
                                 if (queue.getName().equals(queueName)) {
+                                    log.info("found " + queueName);
                                     bindQueue = queue;
                                 }
                             }
-
-                            if (bindQueue == null) {
-                                // queue does not exists
-                                Queue queue = new Queue(queueName);
-                                BindingBuilder.bind(queue).to(exchange).with("");
-                                log.info("new queue and new binding(" + binding.getExchange() + ").destination(" + binding.getDestination() + ").destinationType(" + binding.getDestinationType() + ").routingKey(" + binding.getRoutingKey() + ").isDestinationQueue(" + binding.isDestinationQueue() + ").args(" + binding.getArguments() + ")");
-                            } else {
-                                BindingBuilder.bind(bindQueue).to(exchange).with("");
-                                log.info("queue exists: new binding(" + binding.getExchange() + ").destination(" + binding.getDestination() + ").destinationType(" + binding.getDestinationType() + ").routingKey(" + binding.getRoutingKey() + ").isDestinationQueue(" + binding.isDestinationQueue() + ").args(" + binding.getArguments() + ")");
-                            }
-
-                            // listener to queue
-                            SimpleMessageListenerContainer simpleMessageListenerContainer = new SimpleMessageListenerContainer();
-                            simpleMessageListenerContainer.setConnectionFactory(connectionFactoryExternal());
-                            simpleMessageListenerContainer.setQueueNames(queueName);
-                            simpleMessageListenerContainer.setMessageListener(this);
-
                         }
                     }
                 }
+
+
+                if (!bindingExists) {
+                    if (bindQueue == null) {
+                        log.info("create " + queueName);
+                        bindQueue = new Queue(queueName);
+                        rabbitAdmin().declareQueue(bindQueue);
+                    }
+                    log.info("exchange(" + exchange.getName() + ") -> queue(" + bindQueue + ")");
+                    BindingBuilder.bind(bindQueue).to(exchange).with("");
+                    rabbitAdmin().declareBinding(new Binding(queueName, Binding.DestinationType.QUEUE, exchange.getName(), "", null));
+                }
+
+                // queue exists, binding exists, listen!
+
+                SimpleMessageListenerContainer simpleMessageListenerContainer = new SimpleMessageListenerContainer();
+                simpleMessageListenerContainer.setConnectionFactory(connectionFactory());
+                simpleMessageListenerContainer.setQueueNames(queueName);
+                simpleMessageListenerContainer.setMessageListener(this);
+                simpleMessageListenerContainer.start();
             }
         }
-
-        /**
-         for(Queue queue : rabbitManagementTemplate().getQueues()) {
-         log.info("queue("+queue.getName()+").isDurable("+queue.isDurable()+").isAutoDelete("+queue.isAutoDelete()+").isExclusive("+queue.isExclusive()+").args("+queue.getArguments()+")");
-         }
-
-         for(Binding binding : rabbitManagementTemplate().getBindings()) {
-         log.info("binding("+binding.getExchange()+").destination("+binding.getDestination()+").destinationType("+binding.getDestinationType()+").routingKey("+binding.getRoutingKey()+").isDestinationQueue("+binding.isDestinationQueue()+").args("+binding.getArguments()+")");
-         }
-         */
     }
-
-    /**
-    @Bean
-    Queue queue() {
-        return new Queue(queueName, false);
-    }
-
-    @Bean
-    Exchange exchange() {
-        return new TopicExchange("spring-boot-exchange");
-    }
-
-    @Bean
-    Binding binding(Queue queue, TopicExchange exchange) {
-    return )BindingBuilder.bind(queue).to(exchange).with("";
-    }
-     */
-
-    @Bean
-    SimpleMessageListenerContainer simpleMessageListenerContainerExternal() {
-        SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
-        container.setConnectionFactory(connectionFactoryExternal());
-        container.setQueueNames(queueName);
-        container.setMessageListener(this);
-        return container;
-    }
-
-
 
     public void onMessage(Message message) {
         String body = new String(message.getBody());
@@ -243,6 +193,13 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
     @Override
     public void onMessage(Message message, Channel channel) throws Exception {
         MessageProperties messageProperties = message.getMessageProperties();
+
+        String exchange = messageProperties.getReceivedExchange();
+        byte[] body = message.getBody();
+
+        unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(SerializationUtils.serialize(new MessageWithPayload(exchange, MessageWithPayload.ExchangeType.HeadersExchange, body))));
         log.info(ReflectionToStringBuilder.toString(message));
     }
+
+
 }

@@ -3,7 +3,7 @@ var connection = amqp.createConnection({ host: "rabbitmq", port: 5673 });
 var count = 1;
 
 connection.on('ready', function () {
-    connection.exchange("spring-boot-exchange", options={durable:true, autoDelete:false}, function(exchange) {
+    connection.exchange("sigfox", options = {type: 'headers', durable: true, autoDelete: false}, function (exchange) {
 
         var sendMessage = function(exchange, payload) {
             var encoded_payload = JSON.stringify(payload);
