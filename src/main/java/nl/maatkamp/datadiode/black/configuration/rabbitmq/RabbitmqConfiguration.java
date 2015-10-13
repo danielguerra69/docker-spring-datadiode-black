@@ -1,10 +1,13 @@
 package nl.maatkamp.datadiode.black.configuration.rabbitmq;
 
+import com.rabbitmq.client.Channel;
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitManagementTemplate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -18,56 +21,38 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
+
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Created by marcel on 23-09-15.
  */
 @Configuration
-public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor {
+@EnableScheduling
+public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanPostProcessor {
+
     final static String queueName = "spring-boot";
     private static final Logger log = LoggerFactory.getLogger(RabbitmqConfiguration.class);
+
     @Autowired
     AnnotationConfigApplicationContext context;
 
+    String DATA_DIODE_QUEUENAME_SUFFIX = ".dd";
+
+    List<String> standardExchanges =
+            Arrays.asList(
+                    "amq.direct",
+                    "amq.fanout",
+                    "amq.headers",
+                    "amq.match",
+                    "amq.rabbitmq.log",
+                    "amq.rabbitmq.trace",
+                    "amq.topic");
 
 
-
-    // org.springframework.boot.autoconfigure.amqp.RabbitAnnotationDrivenConfiguration
-    // org.springframework.amqp.rabbit.config.internalRabbitListenerEndpointRegistry
-    // org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
-    // org.springframework.boot.autoconfigure.amqp.RabbitProperties
-    // org.springframework.amqp.rabbit.annotation.RabbitBootstrapConfiguration
-
-    // RabbitListenerAnnotationBeanPostProcessor
-
-    // RabbitListenerEndpointRegistry
-    // * <p>Contrary to {@link MessageListenerContainer}s created manually, listener
-    // * containers managed by registry are not beans in the application context and
-    // * are not candidates for autowiring. Use {@link #getListenerContainers()} if
-    //         * you need to access this registry's listener containers for management purposes.
-    //         * If you need to access to a specific message listener container, use
-    // * {@link #getListenerContainer(String)} with the id of the endpoint.
-
-
-    // org.springframework.amqp.rabbit.connection.AbstractConnectionFactory.createBareConnection() {
-    //   connection = new SimpleConnection(this.rabbitConnectionFactory.newConnection(this.executorService, this.addresses), this.closeTimeout) ->
-
-    // com.rabbitmq.client.ConnectionFactory
-    //      private int requestedFrameMax = DEFAULT_FRAME_MAX;
-    //   public void setRequestedFrameMax(int requestedFrameMax) {this.requestedFrameMax = requestedFrameMax;}
-    //   newConnection(ExecutorService executor, Address[] addrs) {
-    //   ..
-    //   ConnectionParams params = params(executor);
-    //   AMQConnection conn = new AMQConnection(params, handler);
-    // }
-
-    // com.rabbitmq.client.impl.AMQConnection():
-    //          this.requestedFrameMax = params.getRequestedFrameMax();
-
-    // int channelMax = negotiateChannelMax(this.requestedChannelMax,connTune.getChannelMax());
-    //  _channelManager = instantiateChannelManager(channelMax, threadFactory);
-    //  int frameMax = negotiatedMaxValue(this.requestedFrameMax,connTune.getFrameMax());
-    //  this._frameMax = frameMax;
     @Autowired
     Environment environment;
 
@@ -144,7 +129,65 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         return rabbitManagementTemplate;
     }
 
+    @Scheduled(fixedDelay = 5000)
+    void checkForNewExchanges() {
 
+        for (Exchange exchange : rabbitManagementTemplate().getExchanges()) {
+            log.info("exchange(" + exchange.getName() + "/" + exchange.getType() + ").isDurable(" + exchange.isDurable() + ").isAutoDelete(" + exchange.isAutoDelete() + ").args(" + exchange.getArguments() + ")");
+            String queueName = exchange.getName() + DATA_DIODE_QUEUENAME_SUFFIX;
+
+            if (exchange.getName() != null && !standardExchanges.contains(exchange.getName())) {
+                for (Binding binding : rabbitManagementTemplate().getBindings()) {
+                    if (binding.getExchange().equals(exchange.getName())) {
+
+                        if (binding.getDestination().equals(queueName)) {
+                            // binding exists, so queue exists
+
+                            log.info("binding exists: binding(" + binding.getExchange() + ").destination(" + binding.getDestination() + ").destinationType(" + binding.getDestinationType() + ").routingKey(" + binding.getRoutingKey() + ").isDestinationQueue(" + binding.isDestinationQueue() + ").args(" + binding.getArguments() + ")");
+                        } else {
+                            Queue bindQueue = null;
+
+                            for (Queue queue : rabbitManagementTemplate().getQueues()) {
+                                // queue exists, bind
+                                if (queue.getName().equals(queueName)) {
+                                    bindQueue = queue;
+                                }
+                            }
+
+                            if (bindQueue == null) {
+                                // queue does not exists
+                                Queue queue = new Queue(queueName);
+                                BindingBuilder.bind(queue).to(exchange).with("");
+                                log.info("new queue and new binding(" + binding.getExchange() + ").destination(" + binding.getDestination() + ").destinationType(" + binding.getDestinationType() + ").routingKey(" + binding.getRoutingKey() + ").isDestinationQueue(" + binding.isDestinationQueue() + ").args(" + binding.getArguments() + ")");
+                            } else {
+                                BindingBuilder.bind(bindQueue).to(exchange).with("");
+                                log.info("queue exists: new binding(" + binding.getExchange() + ").destination(" + binding.getDestination() + ").destinationType(" + binding.getDestinationType() + ").routingKey(" + binding.getRoutingKey() + ").isDestinationQueue(" + binding.isDestinationQueue() + ").args(" + binding.getArguments() + ")");
+                            }
+
+                            // listener to queue
+                            SimpleMessageListenerContainer simpleMessageListenerContainer = new SimpleMessageListenerContainer();
+                            simpleMessageListenerContainer.setConnectionFactory(connectionFactoryExternal());
+                            simpleMessageListenerContainer.setQueueNames(queueName);
+                            simpleMessageListenerContainer.setMessageListener(this);
+
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         for(Queue queue : rabbitManagementTemplate().getQueues()) {
+         log.info("queue("+queue.getName()+").isDurable("+queue.isDurable()+").isAutoDelete("+queue.isAutoDelete()+").isExclusive("+queue.isExclusive()+").args("+queue.getArguments()+")");
+         }
+
+         for(Binding binding : rabbitManagementTemplate().getBindings()) {
+         log.info("binding("+binding.getExchange()+").destination("+binding.getDestination()+").destinationType("+binding.getDestinationType()+").routingKey("+binding.getRoutingKey()+").isDestinationQueue("+binding.isDestinationQueue()+").args("+binding.getArguments()+")");
+         }
+         */
+    }
+
+    /**
     @Bean
     Queue queue() {
         return new Queue(queueName, false);
@@ -157,8 +200,9 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
 
     @Bean
     Binding binding(Queue queue, TopicExchange exchange) {
-        return BindingBuilder.bind(queue).to(exchange).with("");
+    return )BindingBuilder.bind(queue).to(exchange).with("";
     }
+     */
 
     @Bean
     SimpleMessageListenerContainer simpleMessageListenerContainerExternal() {
@@ -176,10 +220,10 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
         log.info("body("+body.length()+"): (" + body + ")..");
 
         // create exchange
-        rabbitAdminInternal().declareExchange(exchange());
+        // rabbitAdminInternal().declareExchange(exchange());
 
         // send other rmq
-        rabbitTemplateInternal().convertAndSend(exchange().getName(), "", body);
+        // rabbitTemplateInternal().convertAndSend(exchange().getName(), "", body);
 
         // unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(message.getBody()));
     }
@@ -194,5 +238,11 @@ public class RabbitmqConfiguration implements MessageListener, BeanPostProcessor
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
         return bean;
+    }
+
+    @Override
+    public void onMessage(Message message, Channel channel) throws Exception {
+        MessageProperties messageProperties = message.getMessageProperties();
+        log.info(ReflectionToStringBuilder.toString(message));
     }
 }

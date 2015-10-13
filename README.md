@@ -4,7 +4,7 @@ Reference Implementation of AMQP with RabbitMQ over a data diode where messages 
 
 # Start 
 
-Start rabbitmq
+Start rabbitmq with mqtt enabled to prove IoT 
 ```
 cd contrib/rabbitmq
 docker-compose up
