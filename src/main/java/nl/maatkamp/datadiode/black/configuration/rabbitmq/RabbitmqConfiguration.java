@@ -111,6 +111,25 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
         return rabbitManagementTemplate;
     }
 
+    @Bean
+    Exchange testExchange() {
+        Exchange exchange = new FanoutExchange("testExchange");
+        return exchange;
+    }
+
+    int index = 7500;
+
+    @Scheduled(fixedDelay = 2000)
+    void sendTestMessages() {
+        String msg = "";
+        for(int i = 0; i<index; i++) {
+            msg = msg + "X";
+        }
+        rabbitTemplate().convertAndSend(testExchange().getName(), null, msg);
+
+        index = index + 100;
+    }
+
     @Scheduled(fixedDelay = 5000)
     void checkForNewExchanges() {
 
@@ -197,8 +216,10 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
         String exchange = messageProperties.getReceivedExchange();
         byte[] body = message.getBody();
 
-        unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(SerializationUtils.serialize(new MessageWithPayload(exchange, MessageWithPayload.ExchangeType.HeadersExchange, body))));
-        log.info(ReflectionToStringBuilder.toString(message));
+        byte[] payload = SerializationUtils.serialize(new MessageWithPayload(exchange, MessageWithPayload.ExchangeType.HeadersExchange, body));
+
+        unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
+        log.info("msg.payload(" + payload.length+").body("+body.length+")");
     }
 
 
