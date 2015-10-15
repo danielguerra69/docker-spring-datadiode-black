@@ -117,7 +117,7 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
         return exchange;
     }
 
-    int index = 7500;
+    int index = 1000;
 
     @Scheduled(fixedDelay = 2000)
     void sendTestMessages() {
@@ -127,7 +127,7 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
         }
         rabbitTemplate().convertAndSend(testExchange().getName(), null, msg);
 
-        index = index + 100;
+        // index = index + 100;
     }
 
     @Scheduled(fixedDelay = 5000)
