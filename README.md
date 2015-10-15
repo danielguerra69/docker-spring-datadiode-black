@@ -25,5 +25,10 @@ sudo ethtool -K eth0 sg off
 sudo ifconfig eth0 mtu 9000
 sudo ifconfig eth0 mtu 16110
 ip link show eth0
-sudo socat UDP4-RECVFROM:1234,fork UDP4-SENDTO:<client ip>:1234
+
+black
+socat UDP4-RECVFROM:1234,fork udp-datagram:172.16.99.255:1235,broadcast
+
+red
+socat UDP4-RECVFROM:1235,fork UDP4-SENDTO:172.16.128.4:1234
 ```
