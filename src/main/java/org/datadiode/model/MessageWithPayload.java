@@ -1,4 +1,4 @@
-package nl.maatkamp.datadiode.model;
+package org.datadiode.model;
 
 import java.io.Serializable;
 

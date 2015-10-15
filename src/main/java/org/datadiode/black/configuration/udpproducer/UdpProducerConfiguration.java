@@ -1,6 +1,5 @@
-package nl.maatkamp.datadiode.black.configuration.udpproducer;
+package org.datadiode.black.configuration.udpproducer;
 
-import com.rabbitmq.client.impl.SocketFrameHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,17 +7,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.integration.channel.QueueChannel;
-import org.springframework.integration.ip.udp.UnicastReceivingChannelAdapter;
 import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
-import org.springframework.messaging.Message;
-import org.springframework.messaging.support.GenericMessage;
-import org.springframework.messaging.support.MessageBuilder;
 import reactor.spring.context.config.EnableReactor;
-
-import java.net.DatagramSocket;
-import java.net.InetSocketAddress;
-import java.net.SocketException;
 
 /**
  * Created by marcel on 25-09-15.

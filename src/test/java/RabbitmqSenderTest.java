@@ -1,5 +1,4 @@
-import nl.maatkamp.datadiode.black.DatadiodeBlackStarter;
-import nl.maatkamp.datadiode.black.configuration.rabbitmq.RabbitmqConfiguration;
+import org.datadiode.black.DatadiodeBlackStarter;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.amqp.AmqpException;

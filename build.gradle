@@ -55,6 +55,8 @@ dependencies {
 
     compile 'com.github.mucaho:jnetrobust-core:0.0.2'
     compile 'org.apache.commons:commons-lang3:3.4'
+    compile 'org.bouncycastle:bcprov-jdk15on:1.53'
+
 
 
     testCompile("junit:junit")
@@ -71,5 +73,5 @@ def weaver = "-javaagent:lib/spring-instrument-4.2.1.RELEASE.jar"
 applicationDefaultJvmArgs = [ weaver, "-Dfile.encoding=UTF-8"]
 
 springBoot {
-    mainClass = 'nl.maatkamp.datadiode.black.DatadiodeBlackStarter'
+    mainClass = 'DatadiodeBlackStarter'
 }
