@@ -1,18 +1,16 @@
-package nl.maatkamp.datadiode.black.configuration.rabbitmq;
+package org.datadiode.black.configuration.rabbitmq;
 
-import com.rabbitmq.client.Channel;
-import nl.maatkamp.datadiode.model.MessageWithPayload;
-import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+import org.datadiode.black.configuration.rabbitmq.listener.SensorEventListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitManagementTemplate;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;
 import org.springframework.amqp.support.converter.DefaultClassMapper;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,10 +20,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.integration.ip.udp.UnicastSendingMessageHandler;
-import org.springframework.messaging.support.GenericMessage;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.util.SerializationUtils;
 
 import java.util.Arrays;
 import java.util.List;
@@ -35,7 +31,7 @@ import java.util.List;
  */
 @Configuration
 @EnableScheduling
-public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanPostProcessor {
+public class RabbitmqConfiguration implements BeanPostProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(RabbitmqConfiguration.class);
 
@@ -60,6 +56,8 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
 
     @Autowired
     UnicastSendingMessageHandler unicastSendingMessageHandler;
+    int index = 1000;
+    int count = 1;
 
     @Bean
     DefaultClassMapper defaultClassMapper() {
@@ -79,21 +77,18 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
         return connectionFactory;
     }
 
-
-
     @Bean
     RabbitTemplate rabbitTemplate() {
         RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory());
+        log.info("converter: " + rabbitTemplate.getMessageConverter());
         return rabbitTemplate;
     }
-
 
     @Bean
     RabbitAdmin rabbitAdmin() {
         RabbitAdmin rabbitAdmin = new RabbitAdmin(connectionFactory());
         return rabbitAdmin;
     }
-
 
     // https://github.com/spring-projects/spring-amqp/blob/master/spring-rabbit/src/test/java/org/springframework/amqp/rabbit/core/RabbitManagementTemplateTests.java
     // List<Exchange> list = this.template.getExchanges();
@@ -103,7 +98,7 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
     RabbitManagementTemplate rabbitManagementTemplate() {
         log.info("template: " + rabbitTemplate());
         RabbitManagementTemplate rabbitManagementTemplate = new RabbitManagementTemplate(
-                "http://"+environment.getProperty("spring.datadiode.rabbitmq.external.host")+":1"+environment.getProperty("spring.datadiode.rabbitmq.external.port", Integer.class)+"/api/",
+                "http://" + environment.getProperty("spring.datadiode.rabbitmq.external.host") + ":1" + environment.getProperty("spring.datadiode.rabbitmq.external.port", Integer.class) + "/api/",
                 environment.getProperty("spring.datadiode.rabbitmq.external.username"),
                 environment.getProperty("spring.datadiode.rabbitmq.external.password")
         );
@@ -117,9 +112,7 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
         return exchange;
     }
 
-    int index = 7500;
-
-    @Scheduled(fixedDelay = 2000)
+    // @Scheduled(fixedDelay = 200)
     void sendTestMessages() {
         String msg = "";
         for(int i = 0; i<index; i++) {
@@ -127,7 +120,9 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
         }
         rabbitTemplate().convertAndSend(testExchange().getName(), null, msg);
 
-        index = index + 100;
+        log.info("msg(" + count + ")");
+        // index = index + 100;
+        count = count + 1;
     }
 
     @Scheduled(fixedDelay = 5000)
@@ -177,24 +172,20 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
 
                 SimpleMessageListenerContainer simpleMessageListenerContainer = new SimpleMessageListenerContainer();
                 simpleMessageListenerContainer.setConnectionFactory(connectionFactory());
+
+                MessageListenerAdapter messageListenerAdapter = new MessageListenerAdapter(sensorEventListener());
+
                 simpleMessageListenerContainer.setQueueNames(queueName);
-                simpleMessageListenerContainer.setMessageListener(this);
+                simpleMessageListenerContainer.setMessageListener(messageListenerAdapter);
                 simpleMessageListenerContainer.start();
             }
         }
     }
 
-    public void onMessage(Message message) {
-        String body = new String(message.getBody());
-        log.info("body("+body.length()+"): (" + body + ")..");
-
-        // create exchange
-        // rabbitAdminInternal().declareExchange(exchange());
-
-        // send other rmq
-        // rabbitTemplateInternal().convertAndSend(exchange().getName(), "", body);
-
-        // unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(message.getBody()));
+    @Bean
+    SensorEventListener sensorEventListener() {
+        SensorEventListener sensorEventListener = new SensorEventListener();
+        return sensorEventListener;
     }
 
     @Override
@@ -207,19 +198,6 @@ public class RabbitmqConfiguration implements ChannelAwareMessageListener, BeanP
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
         return bean;
-    }
-
-    @Override
-    public void onMessage(Message message, Channel channel) throws Exception {
-        MessageProperties messageProperties = message.getMessageProperties();
-
-        String exchange = messageProperties.getReceivedExchange();
-        byte[] body = message.getBody();
-
-        byte[] payload = SerializationUtils.serialize(new MessageWithPayload(exchange, MessageWithPayload.ExchangeType.HeadersExchange, body));
-
-        unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
-        log.info("msg.payload(" + payload.length+").body("+body.length+")");
     }
 
 
