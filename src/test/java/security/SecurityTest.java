@@ -2,6 +2,7 @@ package security;
 
 import org.bouncycastle.util.encoders.Base64;
 import org.datadiode.black.DatadiodeBlackStarter;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -34,10 +35,15 @@ public class SecurityTest {
     PrivateKey privateKeyServer;
 
     @Autowired
+    Signature signatureServer;
+
+
+
+    @Autowired
     Cipher cipherClient;
 
     @Autowired
-    Cipher cipherSymmetricalKeyClient;
+    Cipher cipherSymmetricalKey;
 
     @Autowired
     SecretKey symmetricalKeyClient;
@@ -45,33 +51,54 @@ public class SecurityTest {
     @Autowired
     PublicKey publicKeyClient;
 
+    @Autowired
+    PrivateKey privateKeyClient;
+
+    @Autowired
+    Signature signatureClient;
+
     @Test
     public void testKeyWrapper() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, SignatureException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException {
 
+        // on the sensor
+        // -------------
+
         String plain = "encrypt me!";
 
-        // crypt aes key
-        cipherServer.init(Cipher.WRAP_MODE, publicKeyServer);
-        byte[] encryptedSymmetricalKey = cipherServer.wrap(symmetricalKeyClient);
+        // sign
+        signatureClient.initSign(privateKeyClient);
+        signatureClient.update((plain).getBytes());
+        byte[] signature = signatureClient.sign();
 
         // crypt text
-        cipherSymmetricalKeyClient.init(Cipher.ENCRYPT_MODE, symmetricalKeyClient);
-        byte[] encrypted = cipherSymmetricalKeyClient.doFinal(plain.getBytes());
+        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, symmetricalKeyClient);
+        byte[] encrypted = cipherSymmetricalKey.doFinal(plain.getBytes());
         log.info("encrypted: " + Base64.toBase64String(encrypted));
+
+        // crypt aes key
+        cipherClient.init(Cipher.WRAP_MODE, publicKeyServer);
+        byte[] encryptedSymmetricalKey = cipherClient.wrap(symmetricalKeyClient);
+
+
+        // on the server
+        // -------------
 
         // unwrap aes key
         cipherServer.init(Cipher.UNWRAP_MODE, privateKeyServer);
         SecretKey decryptedKey = (SecretKey) cipherServer.unwrap(encryptedSymmetricalKey, "AES", Cipher.SECRET_KEY);
 
         // decrypt text
-        cipherSymmetricalKeyClient.init(Cipher.DECRYPT_MODE, decryptedKey);
-        byte[] decypted = cipherSymmetricalKeyClient.doFinal(encrypted);
+        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, decryptedKey);
+        byte[] decypted = cipherSymmetricalKey.doFinal(encrypted);
 
-        Signature sig = Signature.getInstance("RSA");
-        sig.initVerify(publicKeyClient);
-        sig.update(decypted);
-        // sig.verify(signature);
+        // verify signature
+        signatureServer.initVerify(publicKeyClient);
+        signatureServer.update(decypted);
 
+        Assert.assertTrue("signatures same", signatureServer.verify(signature));
+
+
+        Assert.assertEquals("decypted text same as original", plain, new String(decypted));
         log.info("txt: " + new String(decypted));
 
     }
@@ -84,14 +111,14 @@ public class SecurityTest {
         keygenerator.init(128);
         SecretKey secretKey = keygenerator.generateKey();
 
-        cipherSymmetricalKeyClient.init(Cipher.ENCRYPT_MODE, secretKey);
+        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, secretKey);
 
         //sensitive information
         byte[] text = "this is a secret".getBytes();
-        byte[] textEncrypted = cipherSymmetricalKeyClient.doFinal(text);
+        byte[] textEncrypted = cipherSymmetricalKey.doFinal(text);
         log.info("Text Encryted : " + new String(textEncrypted, "UTF-8"));
-        cipherSymmetricalKeyClient.init(Cipher.DECRYPT_MODE, secretKey);
-        byte[] textDecrypted = cipherSymmetricalKeyClient.doFinal(textEncrypted);
+        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, secretKey);
+        byte[] textDecrypted = cipherSymmetricalKey.doFinal(textEncrypted);
         log.info("Text Decryted : " + new String(textDecrypted));
 
     }

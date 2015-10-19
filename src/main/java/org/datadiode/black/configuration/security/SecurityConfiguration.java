@@ -17,6 +17,8 @@ import java.security.spec.InvalidKeySpecException;
 @Configuration
 public class SecurityConfiguration {
 
+    public static final String ALGORITHM_SIGNATURE = "SHA1withRSA";
+
     String ALGORITHM_RSA = "RSA";
     int ALGORITHM_RSA_KEYSIZE = 1024;
 
@@ -28,7 +30,7 @@ public class SecurityConfiguration {
     @Bean
     KeyPairGenerator keyPairGeneratorServer() throws NoSuchAlgorithmException {
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(ALGORITHM_RSA);
-        keyPairGenerator.initialize(1024);
+        keyPairGenerator.initialize(ALGORITHM_RSA_KEYSIZE);
         return keyPairGenerator;
     }
 
@@ -52,6 +54,12 @@ public class SecurityConfiguration {
         Cipher cipher = Cipher.getInstance(ALGORITHM_RSA);
         // cipher.init(Cipher.ENCRYPT_MODE, privateKeyServer());
         return cipher;
+    }
+
+    @Bean
+    Signature signatureServer() throws NoSuchAlgorithmException {
+        Signature signature = Signature.getInstance(ALGORITHM_SIGNATURE);
+        return signature;
     }
 
     // pub.priv client
@@ -85,10 +93,18 @@ public class SecurityConfiguration {
         return cipher;
     }
 
+    @Bean
+    Signature signatureClient() throws NoSuchAlgorithmException {
+        Signature signature = Signature.getInstance(ALGORITHM_SIGNATURE);
+        return signature;
+    }
+
+
+
     // client.aes
 
     @Bean
-    KeyGenerator keyGeneratorSymmetricalKeyClient() throws NoSuchProviderException, NoSuchAlgorithmException {
+    KeyGenerator keyGeneratorSymmetricalKey() throws NoSuchProviderException, NoSuchAlgorithmException {
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
         KeyGenerator keyGenerator = KeyGenerator.getInstance(ALGORITHM_AES, "BC");
         keyGenerator.init(ALGORITHM_AES_KEYSIZE);
@@ -96,25 +112,18 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    SecretKey symmetricalKeyClient() throws NoSuchProviderException, NoSuchAlgorithmException {
-        SecretKey key = keyGeneratorSymmetricalKeyClient().generateKey();
+    SecretKey symmetricalKey() throws NoSuchProviderException, NoSuchAlgorithmException {
+        SecretKey key = keyGeneratorSymmetricalKey().generateKey();
         return key;
     }
 
     @Bean
-    Cipher cipherSymmetricalKeyClient() throws NoSuchPaddingException, NoSuchAlgorithmException, NoSuchProviderException {
+    Cipher cipherSymmetricalKey() throws NoSuchPaddingException, NoSuchAlgorithmException, NoSuchProviderException {
         Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
         Cipher cipher = Cipher.getInstance("AES/ECB/PKCS7Padding", "BC");
         return cipher;
     }
 
 
-    @Bean
-    Cipher cipherSymmetricalKeyClientA() throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException, IOException, InvalidKeyException {
-        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
-        Cipher cipher = Cipher.getInstance(ALGORITHM_AES);
-        cipher.init(Cipher.ENCRYPT_MODE, symmetricalKeyClient());
-        return cipher;
-    }
     // --- /sensor ---
 }
