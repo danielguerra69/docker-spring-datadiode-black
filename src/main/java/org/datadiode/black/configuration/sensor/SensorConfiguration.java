@@ -15,7 +15,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.security.*;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.Arrays;
 
@@ -32,13 +34,10 @@ public class SensorConfiguration {
 
     @Autowired
     Exchange testExchange;
-
-    public static SecretKey createKeyForAES(int bitLength, SecureRandom random)
-            throws NoSuchAlgorithmException, NoSuchProviderException {
-        KeyGenerator generator = KeyGenerator.getInstance("AES", "BC");
-        generator.init(128, random);
-        return generator.generateKey();
-    }
+    @Autowired
+    Cipher cipherServer;
+    @Autowired
+    SecretKey symmetricalKey;
 
     @Bean
     GeoLocation geoLocationAmsterdam() {
@@ -51,35 +50,6 @@ public class SensorConfiguration {
         return sensor;
     }
 
-    @Bean
-    SecureRandom secureRandom() {
-        SecureRandom secureRandom = new SecureRandom();
-        return secureRandom;
-    }
-
-    @Bean
-    Key symmetricalKey() throws NoSuchProviderException, NoSuchAlgorithmException {
-        Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
-
-        KeyGenerator keyGen = KeyGenerator.getInstance("AES", "BC");
-        keyGen.init(256, secureRandom());
-        Key key = keyGen.generateKey();
-        return key;
-    }
-
-    @Bean
-    Cipher cipherRSA() throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchProviderException, IOException, InvalidKeyException {
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.ENCRYPT_MODE, sensor().getPrivateKey());
-        return cipher;
-    }
-
-    @Bean
-    Cipher cipherAES() throws NoSuchPaddingException, NoSuchAlgorithmException, NoSuchProviderException {
-        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS7Padding", "BC");
-        return cipher;
-    }
-
     @Scheduled(fixedDelay = 200)
     void sendTestMessages() throws InvalidKeySpecException, NoSuchAlgorithmException, NoSuchProviderException, IOException, NoSuchPaddingException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         SensorEvent sensorEvent = sensor().generateEvent();
@@ -87,22 +57,20 @@ public class SensorConfiguration {
 
 // SENSOR.KEYS == SERVER.KEYS!!
 
-        Key aesKey = createKeyForAES(256, secureRandom());
-        SecretKey sessionKey = new SecretKeySpec(new byte[16], "AES");
+        cipherServer.init(Cipher.ENCRYPT_MODE, sensor().getPublicKey());
+        byte[] result1 = cipherServer.doFinal(symmetricalKey.getEncoded());
 
-        Cipher c = cipherRSA();
-        c.init(Cipher.ENCRYPT_MODE, sensor().getPublicKey());
-        byte[] result1 = c.doFinal(sessionKey.getEncoded());
+        cipherServer.init(Cipher.WRAP_MODE, sensor().getPublicKey());
+        byte[] result2 = cipherServer.wrap(symmetricalKey);
 
-        c.init(Cipher.WRAP_MODE, sensor().getPublicKey());
-        byte[] result2 = c.wrap(sessionKey);
+        // crypt contents and base64 the result as per http://stackoverflow.com/questions/3451670/java-aes-and-using-my-own-key
 
-        c.init(Cipher.UNWRAP_MODE, sensor().getPrivateKey());
-        SecretKey sessionKey1 = (SecretKey) c.unwrap(result1, "AES",
+        cipherServer.init(Cipher.UNWRAP_MODE, sensor().getPrivateKey());
+        SecretKey sessionKey1 = (SecretKey) cipherServer.unwrap(result1, "AES",
                 Cipher.SECRET_KEY);
 
-        c.init(Cipher.DECRYPT_MODE, sensor().getPrivateKey());
-        SecretKey sessionKey2 = new SecretKeySpec(c.doFinal(result2), "AES");
+        cipherServer.init(Cipher.DECRYPT_MODE, sensor().getPrivateKey());
+        SecretKey sessionKey2 = new SecretKeySpec(cipherServer.doFinal(result2), "AES");
 
         log.info("eq: " + Arrays.equals(sessionKey1.getEncoded(),
                 sessionKey2.getEncoded()));

@@ -4,11 +4,9 @@ import org.datadiode.model.event.GeoLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.FileCopyUtils;
 
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
@@ -30,6 +28,7 @@ public class Sensor {
     private KeyPair keyPair;
     private PrivateKey privateKey;
     private PublicKey publicKey;
+    private Signature signature;
 
     public Sensor(String type, int id, GeoLocation geoLocation) throws NoSuchProviderException, NoSuchAlgorithmException, InvalidKeySpecException, IOException {
         this.type = type;
@@ -44,6 +43,8 @@ public class Sensor {
         this.privateKey = keyPair.getPrivate();
         this.publicKey = keyPair.getPublic();
 
+        this.signature = Signature.getInstance("RSA");
+
         KeyFactory fact = KeyFactory.getInstance("RSA");
         RSAPublicKeySpec rsaPublicKeySpec = fact.getKeySpec(keyPair.getPublic(),
                 RSAPublicKeySpec.class);
@@ -52,6 +53,7 @@ public class Sensor {
 
         saveToFile("public.key", rsaPublicKeySpec.getModulus(),
                 rsaPublicKeySpec.getPublicExponent());
+
         saveToFile("private.key", rsaPrivateKeySpec.getModulus(),
                 rsaPrivateKeySpec.getPrivateExponent());
 
@@ -91,6 +93,10 @@ public class Sensor {
 
     public void saveToFile(String keyname,
                            BigInteger mod, BigInteger exp) throws IOException {
+
+        FileCopyUtils.copy(
+                mod.toByteArray(),
+                new File(keyname));
 
         log.info("key(" + keyname + "): pub(" + mod + "),exp(" + exp + ")");
 

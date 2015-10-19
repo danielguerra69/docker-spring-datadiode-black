@@ -33,11 +33,14 @@ public class SensorEventListener implements ChannelAwareMessageListener {
         String exchange = messageProperties.getReceivedExchange();
         byte[] body = message.getBody();
 
-        SensorEvent sensorEvent = (SensorEvent) rabbitTemplate.getMessageConverter().fromMessage(message);
-
-        byte[] payload = SerializationUtils.serialize(new MessageWithPayload(exchange, MessageWithPayload.ExchangeType.HeadersExchange, body));
-
-        unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
-        log.info("msg.payload(" + payload.length + ").body(" + body.length + ")");
+        Object msg = rabbitTemplate.getMessageConverter().fromMessage(message);
+        if (msg instanceof SensorEvent) {
+            SensorEvent sensorEvent = (SensorEvent) msg;
+            byte[] payload = SerializationUtils.serialize(new MessageWithPayload(exchange, MessageWithPayload.ExchangeType.HeadersExchange, body));
+            unicastSendingMessageHandler.handleMessageInternal(new GenericMessage<byte[]>(payload));
+            log.info("msg.payload(" + payload.length + ").body(" + body.length + ")");
+        } else {
+            log.info("could not decode: " + msg);
+        }
     }
 }
