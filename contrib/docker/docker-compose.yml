@@ -1,6 +1,5 @@
 # https://docs.clusterhq.com/en/1.4.0/labs/compose.html
 rabbitblackexternal:
-  # image: rabbitmq:management
   build: rabbitmq_mqtt/
 
   environment:
@@ -16,7 +15,8 @@ rabbitblackexternal:
     - "25673:25672"
 
 rabbitred:
-  image: rabbitmq:management
+  build: rabbitmq_mqtt/
+
   environment:
     RABBITMQ_NODENAME: rabbitred
   hostname: rabbit_red
