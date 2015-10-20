@@ -62,7 +62,7 @@ task wrapper(type: Wrapper) {
 }
 
 def weaver = "-javaagent:lib/spring-instrument-4.2.1.RELEASE.jar"
-applicationDefaultJvmArgs = [ weaver, "-Dfile.encoding=UTF-8"]
+applicationDefaultJvmArgs = [weaver, "-Dfile.encoding=UTF-8", "-Xbootclasspath:lib/security/local_policy.jar;lib/security/US_export_policy.jar"]
 
 springBoot {
     mainClass = 'org.datadiode.black.DatadiodeBlackStarter'

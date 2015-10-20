@@ -1,5 +1,6 @@
 package security;
 
+import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.util.encoders.Base64;
 import org.datadiode.black.DatadiodeBlackStarter;
 import org.junit.Assert;
@@ -12,6 +13,9 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.util.SerializationUtils;
+import security.model.Data;
+import security.model.EncryptedData;
 
 import javax.crypto.*;
 import java.io.IOException;
@@ -58,14 +62,14 @@ public class SecurityTest {
     Signature signatureClient;
 
     @Test
-    public void testKeyWrapper() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, SignatureException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException {
+    public void testKeyWrapperWithStringAsData() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, SignatureException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException {
 
         // on the sensor
         // -------------
 
         String plain = "encrypt me!";
 
-        // sign
+        // sign the contents
         signatureClient.initSign(privateKeyClient);
         signatureClient.update((plain).getBytes());
         byte[] signature = signatureClient.sign();
@@ -95,11 +99,79 @@ public class SecurityTest {
         signatureServer.initVerify(publicKeyClient);
         signatureServer.update(decypted);
 
-        Assert.assertTrue("signatures same", signatureServer.verify(signature));
-
-
-        Assert.assertEquals("decypted text same as original", plain, new String(decypted));
         log.info("txt: " + new String(decypted));
+
+        Assert.assertTrue("valid signature from client", signatureServer.verify(signature));
+        Assert.assertEquals("decypted text same as original", plain, new String(decypted));
+    }
+
+
+    @Test
+    public void testKeyWrapperWithPojoAsData() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, SignatureException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException {
+
+        // -------------
+        // on the client
+        // -------------
+        String text = "encrypt me!";
+
+        byte[] plain = SerializationUtils.serialize(new Data(text));
+
+        EncryptedData encryptedData = new EncryptedData();
+
+        // calculate digest
+        SHA256Digest sha256Digest = new SHA256Digest();
+        byte[] digest = new byte[sha256Digest.getDigestSize()];
+        sha256Digest.update(plain, 0, plain.length);
+        sha256Digest.doFinal(digest, 0);
+
+        // sign the digest
+        signatureClient.initSign(privateKeyClient);
+        signatureClient.update(digest);
+        encryptedData.signature = signatureClient.sign();
+
+        // crypt text
+        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, symmetricalKeyClient);
+        encryptedData.encryptedData = cipherSymmetricalKey.doFinal(plain);
+
+        // crypt aes key
+        cipherClient.init(Cipher.WRAP_MODE, publicKeyServer);
+        encryptedData.encryptedKey = cipherClient.wrap(symmetricalKeyClient);
+
+        // ---------
+        // transport
+        // ---------
+        EncryptedData serializedEncryptedData =
+                (EncryptedData) SerializationUtils.deserialize(
+                        SerializationUtils.serialize(encryptedData));
+
+        // -------------
+        // on the server
+        // -------------
+
+        // unwrap aes key
+        cipherServer.init(Cipher.UNWRAP_MODE, privateKeyServer);
+        SecretKey decryptedKey = (SecretKey) cipherServer.unwrap(serializedEncryptedData.encryptedKey, "AES", Cipher.SECRET_KEY);
+
+        // decrypt text
+        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, decryptedKey);
+        byte[] decyptedData = cipherSymmetricalKey.doFinal(serializedEncryptedData.encryptedData);
+
+        // calculate digest
+        SHA256Digest sha256DigestServer = new SHA256Digest();
+        byte[] digestServer = new byte[sha256Digest.getDigestSize()];
+        sha256DigestServer.update(decyptedData, 0, decyptedData.length);
+        sha256DigestServer.doFinal(digestServer, 0);
+
+        // verify signature from digest
+        signatureServer.initVerify(publicKeyClient);
+        signatureServer.update(digestServer);
+
+        Assert.assertTrue("valid signature(" + Base64.toBase64String(serializedEncryptedData.signature) + ") from client", signatureServer.verify(serializedEncryptedData.signature));
+
+        if (signatureServer.verify(serializedEncryptedData.signature)) {
+            Data decryptedData = (Data) SerializationUtils.deserialize(decyptedData);
+            Assert.assertEquals("decypted text same as original", decryptedData.msg, text);
+        }
 
     }
 
