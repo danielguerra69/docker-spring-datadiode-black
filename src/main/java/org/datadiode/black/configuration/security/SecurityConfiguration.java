@@ -8,6 +8,7 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.IOException;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
@@ -30,7 +31,7 @@ public class SecurityConfiguration {
 
     // AES settings
     String ALGORITHM_AES = "AES";
-    String ALGORITHM_AES_CIPHER = "AES/ECB/PKCS7Padding";
+    String ALGORITHM_AES_CIPHER = "AES/CBC/PKCS7Padding";
     int ALGORITHM_AES_KEYSIZE = 256;
 
     // pub/priv server
@@ -146,6 +147,18 @@ public class SecurityConfiguration {
         Security.addProvider(new BouncyCastleProvider());
         Cipher cipher = Cipher.getInstance(ALGORITHM_AES_CIPHER, SECURITY_PROVIDER);
         return cipher;
+    }
+
+    @Bean
+    SecureRandom secureRandom() {
+        SecureRandom secureRandom = new SecureRandom();
+        return secureRandom;
+    }
+
+    @Bean
+    IvParameterSpec ivParameterSpec() {
+        IvParameterSpec ivParameterSpec = new IvParameterSpec(secureRandom().generateSeed(16));
+        return ivParameterSpec;
     }
 
 

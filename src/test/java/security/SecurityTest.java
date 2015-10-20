@@ -18,6 +18,7 @@ import security.model.Data;
 import security.model.EncryptedData;
 
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 import java.io.IOException;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
@@ -61,8 +62,12 @@ public class SecurityTest {
     @Autowired
     Signature signatureClient;
 
+    @Autowired
+    IvParameterSpec ivParameterSpec;
+
+
     @Test
-    public void testKeyWrapperWithStringAsData() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, SignatureException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException {
+    public void testKeyWrapperWithStringAsData() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, SignatureException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException, InvalidAlgorithmParameterException {
 
         // on the sensor
         // -------------
@@ -75,7 +80,7 @@ public class SecurityTest {
         byte[] signature = signatureClient.sign();
 
         // crypt text
-        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, symmetricalKeyClient);
+        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, symmetricalKeyClient, ivParameterSpec);
         byte[] encrypted = cipherSymmetricalKey.doFinal(plain.getBytes());
         log.info("encrypted: " + Base64.toBase64String(encrypted));
 
@@ -92,7 +97,7 @@ public class SecurityTest {
         SecretKey decryptedKey = (SecretKey) cipherServer.unwrap(encryptedSymmetricalKey, "AES", Cipher.SECRET_KEY);
 
         // decrypt text
-        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, decryptedKey);
+        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, decryptedKey, ivParameterSpec);
         byte[] decypted = cipherSymmetricalKey.doFinal(encrypted);
 
         // verify signature
@@ -106,8 +111,21 @@ public class SecurityTest {
     }
 
 
+    /**
+     * Emulate a diode to test end-to-end encryption is configured for AES256
+     *
+     * @throws InvalidKeyException
+     * @throws NoSuchAlgorithmException
+     * @throws BadPaddingException
+     * @throws IllegalBlockSizeException
+     * @throws SignatureException
+     * @throws NoSuchProviderException
+     * @throws InvalidKeySpecException
+     * @throws NoSuchPaddingException
+     * @throws IOException
+     */
     @Test
-    public void testKeyWrapperWithPojoAsData() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, SignatureException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException {
+    public void testKeyWrapperWithPojoAsData() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, SignatureException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException, InvalidAlgorithmParameterException {
 
         // -------------
         // on the client
@@ -130,7 +148,7 @@ public class SecurityTest {
         encryptedData.signature = signatureClient.sign();
 
         // crypt text
-        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, symmetricalKeyClient);
+        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, symmetricalKeyClient, ivParameterSpec);
         encryptedData.encryptedData = cipherSymmetricalKey.doFinal(plain);
 
         // crypt aes key
@@ -138,7 +156,7 @@ public class SecurityTest {
         encryptedData.encryptedKey = cipherClient.wrap(symmetricalKeyClient);
 
         // ---------
-        // transport
+        // transport via serialization
         // ---------
         EncryptedData serializedEncryptedData =
                 (EncryptedData) SerializationUtils.deserialize(
@@ -150,10 +168,11 @@ public class SecurityTest {
 
         // unwrap aes key
         cipherServer.init(Cipher.UNWRAP_MODE, privateKeyServer);
-        SecretKey decryptedKey = (SecretKey) cipherServer.unwrap(serializedEncryptedData.encryptedKey, "AES", Cipher.SECRET_KEY);
+        SecretKey decryptedKey = (SecretKey) cipherServer.unwrap(
+                serializedEncryptedData.encryptedKey, "AES", Cipher.SECRET_KEY);
 
         // decrypt text
-        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, decryptedKey);
+        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, decryptedKey, ivParameterSpec);
         byte[] decyptedData = cipherSymmetricalKey.doFinal(serializedEncryptedData.encryptedData);
 
         // calculate digest
@@ -177,22 +196,23 @@ public class SecurityTest {
 
 
     @Test
-    public void testAESSingle() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException {
+    public void testAESSingle() throws InvalidKeyException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException, NoSuchProviderException, InvalidKeySpecException, NoSuchPaddingException, IOException, InvalidAlgorithmParameterException {
 
         KeyGenerator keygenerator = KeyGenerator.getInstance("AES");
         keygenerator.init(128);
         SecretKey secretKey = keygenerator.generateKey();
 
-        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, secretKey);
+        cipherSymmetricalKey.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec);
 
         //sensitive information
         byte[] text = "this is a secret".getBytes();
-        byte[] textEncrypted = cipherSymmetricalKey.doFinal(text);
-        log.info("Text Encryted : " + new String(textEncrypted, "UTF-8"));
-        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, secretKey);
-        byte[] textDecrypted = cipherSymmetricalKey.doFinal(textEncrypted);
-        log.info("Text Decryted : " + new String(textDecrypted));
 
+        byte[] textEncrypted = cipherSymmetricalKey.doFinal(text);
+
+        cipherSymmetricalKey.init(Cipher.DECRYPT_MODE, secretKey, ivParameterSpec);
+        byte[] textDecrypted = cipherSymmetricalKey.doFinal(textEncrypted);
+
+        Assert.assertEquals("decypted text same as original", new String(text), new String(textDecrypted));
     }
 
 }
