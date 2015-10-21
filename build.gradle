@@ -18,6 +18,7 @@ apply plugin: 'eclipse'
 apply plugin: 'idea'
 apply plugin: 'spring-boot'
 apply plugin: 'docker'
+apply plugin: 'scala'
 
 jar {
     baseName = 'datadiode-black'
@@ -69,4 +70,13 @@ applicationDefaultJvmArgs = [weaver, "-Dfile.encoding=UTF-8"]
 
 springBoot {
     mainClass = 'org.datadiode.black.DatadiodeBlackStarter'
+}
+
+task runApp(type: JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+
+    main = ''
+
+    // arguments to pass to the application
+    args 'Encryption'
 }
