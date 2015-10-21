@@ -52,17 +52,20 @@ dependencies {
     compile 'org.apache.commons:commons-lang3:3.4'
     compile 'commons-io:commons-io:2.4'
 
+    compile "org.scala-lang:scala-library:2.11.7"
+    compile "org.scala-lang:scala-compiler:2.11.7"
+
     testCompile("junit:junit")
     testCompile("org.springframework.boot:spring-boot-starter-test")
 
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.3'
+    gradleVersion = '2.8'
 }
 
 def weaver = "-javaagent:lib/spring-instrument-4.2.1.RELEASE.jar"
-applicationDefaultJvmArgs = [weaver, "-Dfile.encoding=UTF-8", "-Xbootclasspath:lib/security/local_policy.jar;lib/security/US_export_policy.jar"]
+applicationDefaultJvmArgs = [weaver, "-Dfile.encoding=UTF-8"]
 
 springBoot {
     mainClass = 'org.datadiode.black.DatadiodeBlackStarter'

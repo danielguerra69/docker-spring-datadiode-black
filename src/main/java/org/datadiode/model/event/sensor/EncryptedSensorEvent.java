@@ -17,10 +17,27 @@ public class EncryptedSensorEvent {
 
     byte[] payload;
     byte[] encryptedSymmetricalKey;
+    byte[] iv;
 
     public EncryptedSensorEvent(byte[] encryptedSymmetricalKey, byte[] payload) {
         this.payload = payload;
         this.encryptedSymmetricalKey = encryptedSymmetricalKey;
+    }
+
+    public byte[] getEncryptedSymmetricalKey() {
+        return encryptedSymmetricalKey;
+    }
+
+    public void setEncryptedSymmetricalKey(byte[] encryptedSymmetricalKey) {
+        this.encryptedSymmetricalKey = encryptedSymmetricalKey;
+    }
+
+    public byte[] getIv() {
+        return iv;
+    }
+
+    public void setIv(byte[] iv) {
+        this.iv = iv;
     }
 
     public byte[] getPayload() {

@@ -1,8 +1,9 @@
 package security;
 
+import configuration.SecurityTestConfiguration;
 import org.bouncycastle.crypto.digests.SHA256Digest;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.util.encoders.Base64;
-import org.datadiode.black.DatadiodeBlackStarter;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -10,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration;
 import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.util.SerializationUtils;
@@ -27,10 +27,27 @@ import java.security.spec.InvalidKeySpecException;
  * Created by marcelmaatkamp on 19/10/15.
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@SpringApplicationConfiguration(classes = DatadiodeBlackStarter.class)
-@EnableAutoConfiguration(exclude = {RabbitAutoConfiguration.class})
+@SpringApplicationConfiguration(classes = SecurityTestConfiguration.class)
+@EnableAutoConfiguration
 public class SecurityTest {
     private static final Logger log = LoggerFactory.getLogger(SecurityTest.class);
+
+
+
+    public static final String ALGORITHM_SIGNATURE = "SHA1withRSA";
+
+    // bouncycastle provider
+    String SECURITY_PROVIDER = "BC";
+
+    // RSA settings
+    String ALGORITHM_RSA = "RSA";
+    String ALGORITHM_RSA_CIPHER = "RSA/None/NoPadding";
+    int ALGORITHM_RSA_KEYSIZE = 2048;
+
+    // AES settings
+    String ALGORITHM_AES = "AES";
+    String ALGORITHM_AES_CIPHER = "AES/CBC/PKCS7Padding";
+    int ALGORITHM_AES_KEYSIZE = 256;
 
     @Autowired
     Cipher cipherServer;
@@ -214,5 +231,6 @@ public class SecurityTest {
 
         Assert.assertEquals("decypted text same as original", new String(text), new String(textDecrypted));
     }
+
 
 }

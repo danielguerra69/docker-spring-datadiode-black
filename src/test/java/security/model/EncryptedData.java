@@ -14,6 +14,7 @@ public class EncryptedData implements Serializable {
     public byte[] signature;
     public byte[] encryptedKey;
     public byte[] encryptedData;
+    public byte[] iv;
 
     public String toString() {
         return (new ReflectionToStringBuilder(this) {
@@ -23,6 +24,8 @@ public class EncryptedData implements Serializable {
                 } else if ("encryptedKey".equals(f.getName())) {
                     return Base64.toBase64String(encryptedKey);
                 } else if ("encryptedData".equals(f.getName())) {
+                    return Base64.toBase64String(encryptedData);
+                } else if ("iv".equals(f.getName())) {
                     return Base64.toBase64String(encryptedData);
                 } else {
                     return super.getValue(f);
