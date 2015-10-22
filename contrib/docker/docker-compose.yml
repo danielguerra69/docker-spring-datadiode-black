@@ -1,6 +1,6 @@
 # https://docs.clusterhq.com/en/1.4.0/labs/compose.html
 
-rabbitblackexternal:
+rabbitblackl:
   build: rabbitmq_mqtt/
   environment:
     RABBITMQ_NODENAME: rabbitblack
