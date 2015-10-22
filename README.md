@@ -2,6 +2,11 @@
 
 Reference Implementation of AMQP with RabbitMQ over a data diode where messages are as big as udp packets to avoid the problem of out-of-order arriving packets.
 
+AES-256: http://www.oracle.com/technetwork/java/javase/downloads/jce-7-download-432124.html
+```
+ cp *.lib $JAVA_HOME/jre/lib/security
+```
+
 # Start 
 
 Start rabbitmq with mqtt enabled to prove IoT 
