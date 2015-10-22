@@ -2,7 +2,6 @@
 
 rabbitblackexternal:
   build: rabbitmq_mqtt/
-
   environment:
     RABBITMQ_NODENAME: rabbitblack
   hostname: rabbit_black
